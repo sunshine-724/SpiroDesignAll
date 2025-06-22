@@ -22,10 +22,12 @@ private val platform = getPlatform()
 @Composable
 fun App() {
     //remember修飾子:再描画した際、かかっているデータ構造が初期化されない(逆に言うとつけてないと初期化される)
+    //mutableStateListOf<Offset>:リストに何かしらの操作があると、@Composableアノテーションが発火する
     val circles = remember { mutableStateListOf<Offset>() }
 
     AppTheme {
-        //pointerInput (マウスや指)の入力を受け取るためのModifier
+        //pointerInput:(マウスや指)の入力を受け取るためのModifier
+        //detectDragGestures:ドラッグ操作を検知する
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
