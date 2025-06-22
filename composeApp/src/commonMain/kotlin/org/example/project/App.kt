@@ -5,14 +5,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DividerDefaults.color
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -32,80 +40,55 @@ data class DrawInfo(
     val radius: Float
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App() {
-    val drawnPoints = remember { mutableStateListOf<DrawInfo>() }
-
-    // 現在選択されている色と太さ
-    // val:再代入不可 var:再代入可能
-    // ただし、valで宣言されたオブジェクトの中身は変更可能(ex. val list = mutableListOf(1, 2, 3))
-    var currentColor by remember { mutableStateOf(Color.Blue) }
-    var currentRadius by remember { mutableStateOf(20f) }
-
-    //利用可能な色の種類
-    val availableColors = listOf(Color.Black, Color.Blue, Color.Red, Color.Green)
-
-    AppTheme {
-        Column(modifier = Modifier.fillMaxSize()) {
-
-            // コントロールパネル
-            // sp:文字サイズ dp:レイアウトのサイズ
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.LightGray)
-                    .padding(8.dp)
-            ){
-                Text("Color",fontSize = 16.sp)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ){
-                    availableColors.forEach { color ->
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .background(color)
-                                .clickable{ currentColor = color } //クリックで色を更新
-                        )
-                    }
-                }
+    var showDialog by remember { mutableStateOf(false) }
+    
+    AppTheme { 
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ){
+            Button(onClick = { 
+                showDialog = true 
+            }) {
+                Text("Show Dialog")
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text("Radius: ${currentRadius.toInt()}",fontSize = 16.sp)
-            Slider(
-                value = currentRadius,
-                onValueChange = { newRadius ->
-                    currentRadius = newRadius
-                },
-                valueRange = 5f..50f //スライダーの範囲
-            )
-
-            // 描画キャンバス
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f) //残りの領域全て使用する
-                    .pointerInput(Unit) {
-                        detectDragGestures { change, _ ->
-                            val newPoint: DrawInfo = DrawInfo(
-                                position = change.position,
-                                color = currentColor,
-                                radius = currentRadius
+        }
+        
+        if(showDialog){
+            BasicAlertDialog(
+                onDismissRequest = { showDialog = false }
+            ){
+                Surface(
+                    modifier = Modifier
+                        .width(300.dp) //幅を決める
+                        .wrapContentHeight(), //高さは自動調整
+                        // または
+                        // .size(width = 300.dp, height = 200.dp)  // 幅と高さを固定
+                        // または
+                        // .fillMaxWidth(0.8f)  // 画面幅の80%
+                        // または
+                        // .sizeIn(minWidth = 200.dp, maxWidth = 300.dp)  // 最小・最大サイズを指定
+                    color = Color.LightGray,
+                    shape = RoundedCornerShape(16.dp) //丸みをつける
+                ){
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally, //これ以下の要素を水平中央寄せ
+                    ){
+                        Text("これはCompose Multiplatformで表示されたダイアログです。")
+                        Button(
+                            onClick = { showDialog = false } ,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2196F3),  // カスタムカラー(背景色)
+                                contentColor = Color(0xFFFFFFFF)     // カスタムカラー(文字色)
                             )
-                            drawnPoints.add(newPoint)
+                        ) {
+                            Text("OK")
                         }
                     }
-            ) {
-                drawnPoints.forEach { info ->
-                    drawCircle(
-                        color = info.color,
-                        radius = info.radius,
-                        center = info.position,
-                        style = Stroke(width = 2f)
-                    )
                 }
             }
         }
