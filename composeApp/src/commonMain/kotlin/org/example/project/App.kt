@@ -4,12 +4,14 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.onClick
 import androidx.compose.foundation.PointerMatcher
+import androidx.compose.foundation.background
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,9 +24,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.sp
+import com.github.skydoves.colorpicker.compose.ColorEnvelope
+import com.github.skydoves.colorpicker.compose.ColorPickerController
+import com.github.skydoves.colorpicker.compose.HsvColorPicker
+import com.github.skydoves.colorpicker.compose.PaletteContentScale
+import com.github.skydoves.colorpicker.compose.rememberColorPickerController
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.math.roundToInt
 
 // アプリ起動時に一度だけプラットフォーム固有の実装を取得する
 private val platform = getPlatform()
@@ -68,7 +77,9 @@ fun CustomButton(
 fun App() {
     var currentScreen by remember { mutableStateOf<DialogScreen>(DialogScreen.Hidden) }
     var penRadius by remember { mutableStateOf(20f) }
-    
+    var spurSpeed by remember { mutableStateOf(1f) }
+    var currentColor by remember { mutableStateOf(Color.Black) }
+
     AppTheme { 
         Box(
             modifier = Modifier
@@ -89,20 +100,25 @@ fun App() {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth(0.8f) //幅を決める
-                        .fillMaxHeight(0.8f), // 高さを決める
+                        .fillMaxHeight(1.0f), // 高さを決める
                         // または
                         // .size(width = 300.dp, height = 200.dp)  // 幅と高さを固定
                         // または
                         // .fillMaxWidth(0.8f)  // 画面幅の80%
                         // または
                         // .sizeIn(minWidth = 200.dp, maxWidth = 300.dp)  // 最小・最大サイズを指定
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(10.dp) //丸みをつける
                 ){
                     when (currentScreen) {
                         is DialogScreen.Main -> {
                             MainScreenContent(
-                                onNavigateToPenSize = { currentScreen = DialogScreen.PenSize }
+                                onNavigateToPenSize = { currentScreen = DialogScreen.PenSize },
+                                currentSpeed = spurSpeed,
+                                currentColor = currentColor,
+                                onSpeedChange = { newSpeed -> spurSpeed = newSpeed},
+                                onColorChange = { newColor -> currentColor = newColor}
+
                             )
                         }
                         is DialogScreen.PenSize -> {
@@ -123,12 +139,22 @@ fun App() {
 }
 
 
-
 // メイン画面のコンテンツ
 @Composable
-private fun MainScreenContent(onNavigateToPenSize: () -> Unit) {
+private fun MainScreenContent(
+    onNavigateToPenSize: () -> Unit,
+    currentSpeed: Float,
+    currentColor: Color,
+    onSpeedChange: (Float) -> Unit,
+    onColorChange: (Color) -> Unit
+) {
+    val controller = rememberColorPickerController()
+    var colorCode = currentColor.toArgb()
+
     Column(
-        modifier = Modifier.padding(16.dp),
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxHeight(1f),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         CustomButton("Start") { }
@@ -139,6 +165,58 @@ private fun MainScreenContent(onNavigateToPenSize: () -> Unit) {
         CustomButton("pensize") {
             // クリックされたら、渡された関数を呼び出して画面遷移を依頼する
             onNavigateToPenSize()
+        }
+
+        //小数第2位まで表示
+        Text(
+            text = "Current Speed: ${(currentSpeed * 100).roundToInt() / 100.0}",
+            fontSize = 16.sp
+        )
+
+        Slider(
+            value = currentSpeed,
+            onValueChange = onSpeedChange,
+            valueRange = 0f..10f
+        )
+
+        // カラー設定
+        Row (
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ){
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ){
+                Text(
+                    text = "Current Color",
+                    fontSize = 18.sp
+                )
+                Box(
+                    modifier = Modifier
+                        .size(80.dp) // 四角のサイズ
+                        .background(currentColor) // ★ ここで現在の色を適用
+                )
+            }
+
+            Column (
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ){
+                Text(
+                    text = "Choose Color",
+                    fontSize = 18.sp // お好みのフォントサイズに
+                )
+
+                HsvColorPicker(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(400.dp),
+                    controller = controller,
+                    onColorChanged = { colorEnvelope: ColorEnvelope ->
+                        // do something
+                        onColorChange(colorEnvelope.color)
+                    }
+                )
+            }
         }
     }
 }
@@ -164,11 +242,6 @@ private fun PenSizeScreenContent(
             CustomButton("Medium") { onRadiusChange(10f) }
             CustomButton("Large") { onRadiusChange(20f) }
         }
-//        Slider(
-//            value = currentRadius,
-//            onValueChange = onRadiusChange,
-//            valueRange = 5f..50f
-//        )
         CustomButton("戻る") {
             // クリックされたら、渡された関数を呼び出して戻る
             onNavigateBack()
