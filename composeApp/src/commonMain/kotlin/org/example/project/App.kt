@@ -1,5 +1,9 @@
 package org.example.project
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.onClick
@@ -23,9 +27,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.sp
 import com.github.skydoves.colorpicker.compose.ColorEnvelope
 import com.github.skydoves.colorpicker.compose.ColorPickerController
@@ -80,19 +86,7 @@ fun App() {
     var spurSpeed by remember { mutableStateOf(1f) }
     var currentColor by remember { mutableStateOf(Color.Black) }
 
-    AppTheme { 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .onClick(
-                    matcher = PointerMatcher.mouse(PointerButton.Secondary),
-                    onClick = { currentScreen = DialogScreen.Main }
-                ),
-            contentAlignment = Alignment.Center
-        ){
-            Text("画面のどこでも右クリックしてメニューを開きます")
-        }
-        
+    AppTheme {
         if(currentScreen != DialogScreen.Hidden){
             BasicAlertDialog(
                 onDismissRequest = { currentScreen = DialogScreen.Hidden }
@@ -129,11 +123,55 @@ fun App() {
                             )
                         }
                         else -> {
-                            //Hiddenの場合
+
                         }
                     }
                 }
             }
+        }else{
+            //Hiddenの場合
+            ProgressiveCircle()
+        }
+    }
+}
+
+@Preview
+@Composable
+fun ProgressiveCircle() {
+    // 1. アニメーションさせる角度の値をAnimatableで保持する。初期値は0f。
+    val animatedAngle = remember { Animatable(0f) }
+
+    // 2. このComposableが画面に表示された時に一度だけアニメーションを開始する
+    LaunchedEffect(Unit) {
+        animatedAngle.animateTo(
+            targetValue = 360f, // 目標値は360度
+            animationSpec = tween(
+                durationMillis = 10000, // アニメーション時間：10000ミリ秒 = 10秒
+                easing = LinearEasing   // 一定の速度で変化させる
+            )
+        )
+    }
+
+    // BoxWithConstraintsで画面全体のサイズ情報を取得する(単位:dp)
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        // このスコープ内では maxWidth と maxHeight が使える
+
+        // 幅と高さのうち、短い方の値を計算する
+        val shorterSide = minOf(maxWidth, maxHeight)
+
+        // Canvasのサイズを、計算した「短い方の辺」のサイズに設定する
+        Canvas(
+            modifier = Modifier
+                .size(shorterSide) // ← 明示的に正方形のサイズを指定
+                .background(Color.Blue)
+        ) {
+            drawCircle(
+                color = Color.Red,
+                radius = size.minDimension / 2f
+            )
         }
     }
 }
