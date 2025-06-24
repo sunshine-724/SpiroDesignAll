@@ -74,22 +74,22 @@ Xcodeの画面左上でシミュレータを選択し、再生ボタン（▶️
    targetSdk: 35  
    minSdk: 24  
 ### 6. 実行環境のバージョン (Execution Environment Versions)
-   このアプリケーションが動作する各プラットフォームの実行環境です。
-   Desktop (JVM):
-   実行環境: Java Virtual Machine (JDK)
-   バージョン確認: ターミナルで java -version を実行して確認します。
-   Android:
-   実行環境: Android OS
-   バージョン確認: アプリを実行するエミュレータまたは実機の「設定」->「端末情報」で確認します。
-   iOS:
-   実行環境: iOS
-   バージョン確認: アプリを実行するシミュレータまたは実機の「設定」->「一般」->「情報」で確認します。
-   Web (Wasm):
-   実行環境: Webブラウザ
-   バージョン確認: アプリを表示しているブラウザ（Chrome, Safari等）の「設定」メニューから確認します。
-### 7. 開発・検証環境 (Development & Verification Environment)
+   このアプリケーションが動作する各プラットフォームの実行環境です。  
+   Desktop (JVM):  
+   実行環境: Java Virtual Machine (JDK)  
+   バージョン確認: ターミナルで java -version を実行して確認します。  
+   Android:  
+   実行環境: Android OS  
+   バージョン確認: アプリを実行するエミュレータまたは実機の「設定」->「端末情報」で確認します。  
+   iOS:  
+   実行環境: iOS  
+   バージョン確認: アプリを実行するシミュレータまたは実機の「設定」->「一般」->「情報」で確認します。  
+   Web (Wasm):  
+   実行環境: Webブラウザ  
+   バージョン確認: アプリを表示しているブラウザ（Chrome, Safari等）の「設定」メニューから確認します。  
+### 7. 開発・検証環境 (Development & Verification Environment)  
 
-このプロジェクトの開発および動作検証は、以下の環境で行いました。
+このプロジェクトの開発および動作検証は、以下の環境で行いました。  
 
 * **OS:** `macOS Sequoia 15.0`
 * **IDE:** `IntelliJ IDEA 2025.1.2`
