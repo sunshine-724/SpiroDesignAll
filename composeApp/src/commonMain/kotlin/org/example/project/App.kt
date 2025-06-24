@@ -1,45 +1,73 @@
 package org.example.project
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
+// import androidx.compose.animation.core.Animatable
+// import androidx.compose.animation.core.LinearEasing
+// import androidx.compose.animation.core.tween
+// import androidx.compose.foundation.Canvas
+// import androidx.compose.foundation.ExperimentalFoundationApi
+// import androidx.compose.foundation.layout.*
+// import androidx.compose.foundation.onClick
+// import androidx.compose.foundation.PointerMatcher
+// import androidx.compose.foundation.background
+// import androidx.compose.ui.input.pointer.PointerButton
+// import androidx.compose.foundation.shape.RoundedCornerShape
+// import androidx.compose.material3.BasicAlertDialog
+// import androidx.compose.material3.Button
+// import androidx.compose.material3.ButtonDefaults
+// import androidx.compose.material3.ExperimentalMaterial3Api
+// import androidx.compose.material3.MaterialTheme
+// import androidx.compose.material3.Slider
+// import androidx.compose.material3.Surface
+// import androidx.compose.material3.Text
+// import androidx.compose.material3.TextField
+// import androidx.compose.runtime.*
+// import androidx.compose.ui.Modifier
+// import androidx.compose.ui.unit.dp
+// import androidx.compose.runtime.Composable
+// import androidx.compose.ui.Alignment
+// import androidx.compose.ui.geometry.Offset
+// import androidx.compose.ui.geometry.Size
+// import androidx.compose.ui.graphics.Color
+// import androidx.compose.ui.graphics.StrokeCap
+// import androidx.compose.ui.graphics.drawscope.Stroke
+// import androidx.compose.ui.graphics.toArgb
+// import androidx.compose.ui.input.pointer.pointerInput
+// import androidx.compose.ui.layout.onSizeChanged
+// import androidx.compose.ui.platform.LocalDensity
+// import androidx.compose.ui.unit.sp
+// import androidx.compose.ui.unit.toSize
+// import com.github.skydoves.colorpicker.compose.ColorEnvelope
+// import com.github.skydoves.colorpicker.compose.ColorPickerController
+// import com.github.skydoves.colorpicker.compose.HsvColorPicker
+// import com.github.skydoves.colorpicker.compose.PaletteContentScale
+// import com.github.skydoves.colorpicker.compose.rememberColorPickerController
+// import org.jetbrains.compose.ui.tooling.preview.Preview
+// import kotlin.math.roundToInt
+// import kotlinx.coroutines.delay
+// import kotlin.math.cos
+// import kotlin.math.sin
+
+// --- ▼▼▼ ワイルドカードで整理したリスト ▼▼▼ ---
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.onClick
-import androidx.compose.foundation.PointerMatcher
-import androidx.compose.foundation.background
-import androidx.compose.ui.input.pointer.PointerButton
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import androidx.compose.foundation.shape.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.sp
-import com.github.skydoves.colorpicker.compose.ColorEnvelope
-import com.github.skydoves.colorpicker.compose.ColorPickerController
-import com.github.skydoves.colorpicker.compose.HsvColorPicker
-import com.github.skydoves.colorpicker.compose.PaletteContentScale
-import com.github.skydoves.colorpicker.compose.rememberColorPickerController
+import androidx.compose.ui.*
+import androidx.compose.ui.geometry.*
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.*
+import androidx.compose.ui.input.pointer.*
+import androidx.compose.ui.layout.*
+import androidx.compose.ui.platform.*
+import androidx.compose.ui.unit.*
+import com.github.skydoves.colorpicker.compose.*
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+import kotlin.math.*
+// --- ▲▲▲ ここまで ▲▲▲ ---
 
 // アプリ起動時に一度だけプラットフォーム固有の実装を取得する
 private val platform = getPlatform()
@@ -130,7 +158,57 @@ fun App() {
             }
         }else{
             //Hiddenの場合
-            ProgressiveCircle()
+            //ProgressiveCircle()
+            DrawingCanvas()
+        }
+    }
+}
+
+@Composable
+fun DrawingCanvas(){
+    // 軌跡のリスト
+    val points = remember {mutableStateListOf<Offset>()}
+
+    var canvasSize by remember { mutableStateOf(Size.Zero) }
+
+    LaunchedEffect(canvasSize){
+        if(canvasSize == Size.Zero)return@LaunchedEffect
+
+        var time = 0f
+        val radius = 200f
+
+        // キャンバスのサイズから中心座標を取得する
+        val centerX = canvasSize.width / 2f
+        val centerY = canvasSize.height / 2f
+
+        //Update
+        while(true){
+            val x = centerX + radius * cos(time)
+            val y = centerY + radius * sin(time)
+
+            val newPoint = Offset(x,y)
+
+            points.add(newPoint)
+
+            time += 0.05f
+
+            delay(16L) //遅延を挟むことで、無限ループをUpdateに見せかける
+        }
+    }
+
+    //描画
+    Canvas(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged{ intSize ->
+                canvasSize = intSize.toSize()
+            }){
+        points.forEach{ point ->
+            drawCircle(
+                color = Color.Red,
+                radius = 5f,
+                center = point
+            )
         }
     }
 }
