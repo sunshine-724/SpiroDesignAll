@@ -113,11 +113,13 @@ fun App() {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    var currentScreen by remember { mutableStateOf<DialogScreen>(DialogScreen.Main) }
-    var penRadius by remember { mutableStateOf(20f) }
-    var spurSpeed by remember { mutableStateOf(1f) }
-    var currentColor by remember { mutableStateOf(Color.Black) }
-    var isPlaying by remember { mutableStateOf(false) }
+    var currentScreen by remember { mutableStateOf<DialogScreen>(DialogScreen.Main) } //現在の画面
+    var penRadius by remember { mutableStateOf(20f) } // ペンの太さ
+    var spurSpeed by remember { mutableStateOf(1f) } // スパーギアのスピード
+    var currentColor by remember { mutableStateOf(Color.Black) } //現在の軌跡の色
+    var isPlaying by remember { mutableStateOf(false) } // startかstopかのフラグ
+
+    val locus = remember { mutableStateListOf<PathPoint>() } //軌跡
 
     AppTheme {
         ModalNavigationDrawer(
@@ -148,6 +150,10 @@ fun App() {
                                     },
                                     onPlayingChange = { newIsPlaying ->
                                         isPlaying = newIsPlaying
+                                    },
+                                    onDisplayClear = {
+                                        isPlaying = false
+                                        locus.clear()
                                     }
                                 )
                             }
@@ -184,7 +190,11 @@ fun App() {
                 DrawingCanvas(
                     color = currentColor,
                     speed = spurSpeed,
-                    isPlaying = isPlaying
+                    isPlaying = isPlaying,
+                    locus = locus,
+                    onAddPoint = { newPoint ->
+                        locus.add(newPoint)
+                    }
                 )
             }
         }
@@ -195,7 +205,9 @@ fun App() {
 fun DrawingCanvas(
     color: Color,
     speed : Float,
-    isPlaying : Boolean
+    locus : List<PathPoint>,
+    isPlaying : Boolean,
+    onAddPoint: (PathPoint) -> Unit
 ) {
     val spurGearRadius = 300f            // 固定円（大きい円）の基本半径
     val pinionGearRadius = 50f           // 回転する円（ピニオンギア）の基本半径
@@ -208,11 +220,9 @@ fun DrawingCanvas(
     var penOffset by remember { mutableStateOf(Offset.Zero) } //ペンの中心座標
     var canvasSize by remember { mutableStateOf(Size.Zero) } //キャンバスサイズ(2次元)
 
-    val locus = remember { mutableStateListOf<PathPoint>() } //軌跡のリスト
-
     val latestSpeed by rememberUpdatedState(speed) //毎フレームspeedを監視し変更する
-    val latestIsPlaying by rememberUpdatedState(isPlaying) // startとstopのフラグ
-    val latestColor by rememberUpdatedState(color)
+    val latestIsPlaying by rememberUpdatedState(isPlaying) // 現在のstartとstopのフラグ
+    val latestColor by rememberUpdatedState(color) //現在の色
 
     LaunchedEffect(canvasSize) {
         if (canvasSize == Size.Zero) return@LaunchedEffect
@@ -256,7 +266,7 @@ fun DrawingCanvas(
                 penOffset = pinionCenterOffset + Offset(penRelativeX, penRelativeY)
 
                 val newPathPoint = PathPoint(position = penOffset, color = latestColor)
-                locus.add(newPathPoint)
+                onAddPoint(newPathPoint) //軌跡を追加
 
                 time += 0.02f * latestSpeed
             }
@@ -334,6 +344,7 @@ private fun MainScreenContent(
     onSpeedChange: (Float) -> Unit,
     onColorChange: (Color) -> Unit,
     onPlayingChange: (Boolean) -> Unit,
+    onDisplayClear: () -> Unit
 ) {
     val controller = rememberColorPickerController()
 
@@ -347,9 +358,12 @@ private fun MainScreenContent(
         CustomButton("Stop") {
             onPlayingChange(false)
         }
-        CustomButton("Clear") {}
+        CustomButton("Clear") {
+            onDisplayClear()
+        }
         CustomButton("Save") {}
         CustomButton("Load") {}
+        CustomButton("Export") {}
         CustomButton("pensize") {
             // クリックされたら、渡された関数を呼び出して画面遷移を依頼する
             onNavigateToPenSize()
