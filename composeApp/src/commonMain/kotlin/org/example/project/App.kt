@@ -114,7 +114,7 @@ fun App() {
     val scope = rememberCoroutineScope()
 
     var currentScreen by remember { mutableStateOf<DialogScreen>(DialogScreen.Main) } //現在の画面
-    var penRadius by remember { mutableStateOf(20f) } // ペンの太さ
+    var penRadius by remember { mutableStateOf(10f) } // ペンの太さ
     var spurSpeed by remember { mutableStateOf(1f) } // スパーギアのスピード
     var currentColor by remember { mutableStateOf(Color.Black) } //現在の軌跡の色
     var isPlaying by remember { mutableStateOf(false) } // startかstopかのフラグ
@@ -139,7 +139,6 @@ fun App() {
                                     onNavigateToPenSize = {
                                         currentScreen = DialogScreen.PenSize
                                     },
-                                    // 以下は仮のパラメータ
                                     currentSpeed = spurSpeed,
                                     currentColor = currentColor,
                                     onSpeedChange = { newSpeed ->
@@ -160,8 +159,9 @@ fun App() {
                             is DialogScreen.PenSize -> {
                                 PenSizeScreenContent(
                                     currentRadius = penRadius,
-                                    onRadiusChange = { newRadius ->
-                                        penRadius = newRadius
+                                    onPenSizeChange = { newPenSize ->
+                                        isPlaying = false
+                                        penRadius = newPenSize
                                     },
                                     onNavigateBack = {
                                         currentScreen = DialogScreen.Main
@@ -192,6 +192,7 @@ fun App() {
                     speed = spurSpeed,
                     isPlaying = isPlaying,
                     locus = locus,
+                    penSize = Stroke(penRadius),
                     onAddPoint = { newPoint ->
                         locus.add(newPoint)
                     }
@@ -206,6 +207,7 @@ fun DrawingCanvas(
     color: Color,
     speed : Float,
     locus : List<PathPoint>,
+    penSize : Stroke,
     isPlaying : Boolean,
     onAddPoint: (PathPoint) -> Unit
 ) {
@@ -213,7 +215,7 @@ fun DrawingCanvas(
     val pinionGearRadius = 50f           // 回転する円（ピニオンギア）の基本半径
 
     val spurGearStroke = Stroke(20f) // スパーギアのストローク
-    val pinionGearOrPenStroke = Stroke(10f) // ピニオンギアのストローク & ペン先の直径
+    val pinionGearOrPenStroke = penSize // ピニオンギアのストローク & ペン先の直径
 
     // --- State定義 ---
     var pinionCenterOffset by remember { mutableStateOf(Offset.Zero) } //ピニオンギアの中心座標
@@ -223,6 +225,7 @@ fun DrawingCanvas(
     val latestSpeed by rememberUpdatedState(speed) //毎フレームspeedを監視し変更する
     val latestIsPlaying by rememberUpdatedState(isPlaying) // 現在のstartとstopのフラグ
     val latestColor by rememberUpdatedState(color) //現在の色
+    val latestPenSize by rememberUpdatedState(penSize) //現在のペンのサイズ
 
     LaunchedEffect(canvasSize) {
         if (canvasSize == Size.Zero) return@LaunchedEffect
@@ -269,6 +272,7 @@ fun DrawingCanvas(
                 onAddPoint(newPathPoint) //軌跡を追加
 
                 time += 0.02f * latestSpeed
+            }else{
             }
             delay(16L)
         }
@@ -401,7 +405,8 @@ private fun MainScreenContent(
                     onColorChanged = { colorEnvelope: ColorEnvelope ->
                         // do something
                         onColorChange(colorEnvelope.color)
-                    }
+                    },
+                    initialColor = currentColor,
                 )
             }
         }
@@ -411,7 +416,7 @@ private fun MainScreenContent(
 @Composable
 private fun PenSizeScreenContent(
     currentRadius: Float,
-    onRadiusChange: (Float) -> Unit,
+    onPenSizeChange: (Float) -> Unit,
     onNavigateBack: () -> Unit
 ) {
     Column(
@@ -425,9 +430,9 @@ private fun PenSizeScreenContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            CustomButton("Small") { onRadiusChange(5f) }
-            CustomButton("Medium") { onRadiusChange(10f) }
-            CustomButton("Large") { onRadiusChange(20f) }
+            CustomButton("Small") { onPenSizeChange(5f) }
+            CustomButton("Medium") { onPenSizeChange(10f) }
+            CustomButton("Large") { onPenSizeChange(20f) }
         }
         CustomButton("戻る") {
             // クリックされたら、渡された関数を呼び出して戻る
