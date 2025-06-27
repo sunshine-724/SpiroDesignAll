@@ -83,6 +83,12 @@ sealed class DialogScreen {
     object PenSize : DialogScreen()
 }
 
+// DrawingCanvasの上など、関数の外に定義します
+data class PathPoint(
+    val position: Offset,
+    val color: Color
+)
+
 // カスタムボタンのComposable関数を定義
 @Composable
 fun CustomButton(text: String, onClick: () -> Unit) {
@@ -111,6 +117,7 @@ fun App() {
     var penRadius by remember { mutableStateOf(20f) }
     var spurSpeed by remember { mutableStateOf(1f) }
     var currentColor by remember { mutableStateOf(Color.Black) }
+    var isPlaying by remember { mutableStateOf(false) }
 
     AppTheme {
         ModalNavigationDrawer(
@@ -138,6 +145,9 @@ fun App() {
                                     },
                                     onColorChange = { newColor ->
                                         currentColor = newColor
+                                    },
+                                    onPlayingChange = { newIsPlaying ->
+                                        isPlaying = newIsPlaying
                                     }
                                 )
                             }
@@ -171,7 +181,11 @@ fun App() {
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                DrawingCanvas(color = currentColor)
+                DrawingCanvas(
+                    color = currentColor,
+                    speed = spurSpeed,
+                    isPlaying = isPlaying
+                )
             }
         }
     }
@@ -179,49 +193,135 @@ fun App() {
 
 @Composable
 fun DrawingCanvas(
-    color: Color
+    color: Color,
+    speed : Float,
+    isPlaying : Boolean
 ) {
-    // 軌跡のリスト
-    val points = remember { mutableStateListOf<Offset>() }
+    val spurGearRadius = 300f            // 固定円（大きい円）の基本半径
+    val pinionGearRadius = 50f           // 回転する円（ピニオンギア）の基本半径
 
-    var canvasSize by remember { mutableStateOf(Size.Zero) }
+    val spurGearStroke = Stroke(20f) // スパーギアのストローク
+    val pinionGearOrPenStroke = Stroke(10f) // ピニオンギアのストローク & ペン先の直径
+
+    // --- State定義 ---
+    var pinionCenterOffset by remember { mutableStateOf(Offset.Zero) } //ピニオンギアの中心座標
+    var penOffset by remember { mutableStateOf(Offset.Zero) } //ペンの中心座標
+    var canvasSize by remember { mutableStateOf(Size.Zero) } //キャンバスサイズ(2次元)
+
+    val locus = remember { mutableStateListOf<PathPoint>() } //軌跡のリスト
+
+    val latestSpeed by rememberUpdatedState(speed) //毎フレームspeedを監視し変更する
+    val latestIsPlaying by rememberUpdatedState(isPlaying) // startとstopのフラグ
+    val latestColor by rememberUpdatedState(color)
 
     LaunchedEffect(canvasSize) {
         if (canvasSize == Size.Zero) return@LaunchedEffect
 
+        // --- ストロークを考慮した「実効半径」を定義 ---
+        // 1. 固定円が転がりに影響する「内側の半径」
+        val effectiveSpurGearRadius = spurGearRadius - spurGearStroke.width / 2f
+        // 2. ピニオンが転がる「外側の半径」
+        val effectivePinionGearRadius = pinionGearRadius + pinionGearOrPenStroke.width / 2f
+        // 3. ピニオンの中心からペン先までの距離（今回はピニオンの内周に設定）
+        val effectivePenRadius = pinionGearRadius
+
         var time = 0f
-        val radius = 200f
 
-        // キャンバスのサイズから中心座標を取得する
-        val centerX = canvasSize.width / 2f
-        val centerY = canvasSize.height / 2f
+        // time=0 の時の座標を計算
+        val centerInitDistance = effectiveSpurGearRadius - effectivePinionGearRadius
+        val initialPinionCenterX = centerInitDistance * cos(time)
+        val initialPinionCenterY = centerInitDistance * sin(time)
+        pinionCenterOffset = Offset(initialPinionCenterX, initialPinionCenterY)
 
-        // Update
+        val initialPenRotationAngle = (effectiveSpurGearRadius - effectivePinionGearRadius) / effectivePinionGearRadius * time
+        val initialPenRelativeX = effectivePenRadius * cos(initialPenRotationAngle)
+        val initialPenRelativeY = -effectivePenRadius * sin(initialPenRotationAngle)
+        penOffset = pinionCenterOffset + Offset(initialPenRelativeX, initialPenRelativeY)
+
         while (true) {
-            val x = centerX + radius * cos(time)
-            val y = centerY + radius * sin(time)
+            if(latestIsPlaying){
+                //  ピニオンギア（小さい円）の中心座標を計算
+                //  中心間の距離は「大きい円の実効半径 - 小さい円の実効半径」
+                val centerDistance = effectiveSpurGearRadius - effectivePinionGearRadius
+                val pinionCenterX = centerDistance * cos(time)
+                val pinionCenterY = centerDistance * sin(time)
+                pinionCenterOffset = Offset(pinionCenterX, pinionCenterY)
 
-            val newPoint = Offset(x, y)
+                // ピニオンギアの中心から見た「ペン先」の相対座標を計算
+                val penRotationAngle = (effectiveSpurGearRadius - effectivePinionGearRadius) / effectivePinionGearRadius * time
+                val penRelativeX = effectivePenRadius * cos(penRotationAngle)
+                val penRelativeY = -effectivePenRadius * sin(penRotationAngle) // Yの符号をマイナスに
 
-            points.add(newPoint)
+                // 最終的なペン先の絶対座標を計算
+                penOffset = pinionCenterOffset + Offset(penRelativeX, penRelativeY)
 
-            time += 0.05f
+                val newPathPoint = PathPoint(position = penOffset, color = latestColor)
+                locus.add(newPathPoint)
 
-            delay(16L) // 遅延を挟むことで、無限ループをUpdateに見せかける
+                time += 0.02f * latestSpeed
+            }
+            delay(16L)
         }
     }
 
-    // 描画
-    Canvas(
-        modifier = Modifier
-            .fillMaxSize()
-            .onSizeChanged { intSize ->
-                canvasSize = intSize.toSize()
+    // --- 描画処理 ---
+    Canvas(modifier = Modifier
+        .fillMaxSize()
+        .onSizeChanged { intSize ->
+            canvasSize = intSize.toSize()
+        }
+    ) {
+        val canvasCenter = center
+        println("Speed: $speed")
+
+        // 軌跡の描画（Pathを使うことで滑らかに）
+//        locus.forEach { pathPoint ->
+//            drawCircle(
+//                color = pathPoint.color, // ★ リストに保存された色を使う
+//                radius = penRadius,
+//                center = canvasCenter + pathPoint.position // リストに保存された座標を使う
+//            )
+//            println(center)
+//        }
+        // --- 軌跡の描画 (より連続的に) ---
+        if (locus.size > 1) {
+            for (i in 1 until locus.size) {
+                val prevPoint = locus[i - 1]
+                val currentPoint = locus[i]
+
+                // 前の点から現在の点まで、前の点の色で短い線を描画する
+                drawLine(
+                    color = prevPoint.color,
+                    start = canvasCenter + prevPoint.position,
+                    end = canvasCenter + currentPoint.position,
+                    strokeWidth = pinionGearOrPenStroke.width,
+                    cap = StrokeCap.Round
+                )
             }
-    ) { 
-        points.forEach { point -> 
-            drawCircle(color = color, radius = 5f, center = point) 
-        } 
+        }
+
+        // 固定円の描画
+        drawCircle(
+            color = Color.Blue,
+            radius = spurGearRadius,
+            center = canvasCenter,
+            style = spurGearStroke
+        )
+
+        // 回転する円（ピニオンギア）の描画
+        drawCircle(
+            color = Color.Red,
+            radius = pinionGearRadius,
+            center = canvasCenter + pinionCenterOffset,
+            style = pinionGearOrPenStroke
+        )
+
+        // ペン先の描画
+        drawCircle(
+            color = latestColor,
+            radius = pinionGearOrPenStroke.width,
+            center = canvasCenter + penOffset
+        )
     }
 }
 
@@ -232,7 +332,8 @@ private fun MainScreenContent(
     currentSpeed: Float,
     currentColor: Color,
     onSpeedChange: (Float) -> Unit,
-    onColorChange: (Color) -> Unit
+    onColorChange: (Color) -> Unit,
+    onPlayingChange: (Boolean) -> Unit,
 ) {
     val controller = rememberColorPickerController()
 
@@ -240,8 +341,12 @@ private fun MainScreenContent(
         modifier = Modifier.padding(16.dp).fillMaxHeight(1f),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CustomButton("Start") {}
-        CustomButton("Stop") {}
+        CustomButton("Start") {
+            onPlayingChange(true)
+        }
+        CustomButton("Stop") {
+            onPlayingChange(false)
+        }
         CustomButton("Clear") {}
         CustomButton("Save") {}
         CustomButton("Load") {}
@@ -253,12 +358,11 @@ private fun MainScreenContent(
         // 小数第2位まで表示
         Text(text = "Current Speed: ${(currentSpeed * 100).roundToInt() / 100.0}", fontSize = 16.sp)
 
-        Slider(value = currentSpeed, onValueChange = onSpeedChange, valueRange = 0f..10f)
-
+        Slider(value = currentSpeed, onValueChange = { newSpeed -> onSpeedChange(newSpeed) }, valueRange = 0.1f..5f)
         // カラー設定
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(text = "Current Color", fontSize = 18.sp)
@@ -278,7 +382,7 @@ private fun MainScreenContent(
                 )
 
                 HsvColorPicker(
-                    modifier = Modifier.fillMaxWidth().height(400.dp),
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
                     controller = controller,
                     onColorChanged = { colorEnvelope: ColorEnvelope ->
                         // do something
