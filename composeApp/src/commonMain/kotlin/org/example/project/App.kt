@@ -294,12 +294,18 @@
             // --- 軌跡の描画 (より連続的に) ---
             if (locus.size > 1) {
                 for (i in 1 until locus.size) {
+                    println("描画された座標はlocus[$i] = ${locus[i].position}で描画された色は${locus[i].color}です")
                     val prevPoint = locus[i - 1]
                     val currentPoint = locus[i]
+
+                    // デバッグと問題解決のため、ここで強制的にアルファ値を1.0（不透明）に設定します。
+                    // これで、保存されていた（ただし色が化けてしまった）軌跡が表示されるはずです。
+                    val visibleColor = prevPoint.copy(color = currentPoint.color.copy(alpha = 1.0f))
 
                     // 前の点から現在の点まで、前の点の色で短い線を描画する
                     drawLine(
                         color = prevPoint.color,
+//                        color = visibleColor.color,
                         start = canvasCenter + prevPoint.position,
                         end = canvasCenter + currentPoint.position,
                         strokeWidth = pinionGearOrPenStroke.width,
@@ -373,8 +379,12 @@
                     val csvRows = locus.joinToString(separator = "\n") { pathPoint ->
                         val x = pathPoint.position.x
                         val y = pathPoint.position.y
-                        val colorHex = platform.stringFormat("#%08X",pathPoint.color.toArgb()) // 色を16進数文字列に変換
-                        "$x,$y,$colorHex"
+                        // ColorオブジェクトからR,G,Bのfloat値(0.0f〜1.0f)を取得
+                        val r = pathPoint.color.red
+                        val g = pathPoint.color.green
+                        val b = pathPoint.color.blue
+                        // 新しい形式で文字列を結合
+                        "$x,$y,$r,$g,$b"
                     }
 
                     // 3. ヘッダーとデータを結合して、ファイル保存関数を呼び出す

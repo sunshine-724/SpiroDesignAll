@@ -4,7 +4,6 @@ interface Platform{
     val name: String
     fun showGreeting(name: String)
     fun saveTextToFile(content: String, defaultFileName: String)
-    fun stringFormat(format : String, vararg args: Int): String
 
     /**
      * プラットフォーム固有のファイルピッカーを開き、ユーザーが選択したファイルの内容をテキストとして返すことを期待する関数。

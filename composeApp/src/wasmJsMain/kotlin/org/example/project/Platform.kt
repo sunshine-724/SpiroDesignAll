@@ -14,8 +14,6 @@ import kotlin.coroutines.suspendCoroutine
 @JsFun("createCsvBlob")
 external fun createCsvBlob(content: String): Blob
 
-@JsFun("stringFormatForJavaScript")
-external fun stringFormatForJavaScript(format: String, vararg args: Int): String
 
 class WasmPlatform: Platform {
     override val name: String = "Web with Kotlin/Wasm"
@@ -51,12 +49,6 @@ class WasmPlatform: Platform {
 
         // 5. 使い終わった一時的なURLをメモリから解放する
         URL.revokeObjectURL(url)
-    }
-
-    override fun stringFormat(format: String, vararg args: Int): String {
-        if (args.isEmpty()) return format
-
-        return stringFormatForJavaScript(format, *args)
     }
 
     /**
