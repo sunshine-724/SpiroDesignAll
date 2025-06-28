@@ -2,9 +2,14 @@ package org.example.project
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.HTMLAnchorElement
+import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.url.URL
 import org.w3c.files.Blob
-import kotlin.Any
+import org.w3c.files.FileReader
+import org.w3c.files.get
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
+
 
 @JsFun("createCsvBlob")
 external fun createCsvBlob(content: String): Blob
@@ -49,9 +54,57 @@ class WasmPlatform: Platform {
     }
 
     override fun stringFormat(format: String, vararg args: Int): String {
-        if(args.isEmpty()) return format
+        if (args.isEmpty()) return format
 
         return stringFormatForJavaScript(format, *args)
+    }
+
+    /**
+     * `expect fun openFileAndReadText`のWASMブラウザ向け実装。
+     * DOM APIを使用してファイル入力要素を動的に作成し、ファイル読み込み処理を行います。
+     * @param allowedFileExtensions 開くのを許可しているファイルの拡張子
+     * @return csvファイルから読み取ったものを一つのString変数として返します
+     */
+    override suspend fun openFileAndReadText(allowedFileExtensions: List<String>): String? {
+        return suspendCoroutine{ continuation ->
+            // 1. 動的に<input type="file">要素を作成
+            val fileInput = (document.createElement("input") as HTMLInputElement).apply {
+                type = "file"
+                style.display = "none" // ユーザーには見えないようにする
+                accept = allowedFileExtensions.joinToString(",") // 例: ".csv,.txt"
+            }
+
+            // 2. ファイルが選択されたときの処理を設定
+            fileInput.onchange = {
+                val file = fileInput.files?.get(0)
+                if (file != null) {
+                    val reader = FileReader()
+                    // 読み込み完了時の処理
+                    reader.onload = {
+                        // JsAny型からString型にキャストするには一度JsString型に変換する必要がある
+                        val result = reader.result as? JsString
+                        val stringResult = result?.toString()
+                        continuation.resume(stringResult)
+                        document.body?.removeChild(fileInput)
+                    }
+                    // 読み込み失敗時の処理
+                    reader.onerror = {
+                        println("Error reading file: ${reader.error}")
+                        continuation.resume(null) // 失敗した場合はnullを返す
+                        document.body?.removeChild(fileInput)
+                    }
+                    reader.readAsText(file)
+                } else {
+                    // ファイルが選択されなかった（キャンセルされた）場合
+                    continuation.resume(null)
+                    document.body?.removeChild(fileInput)
+                }
+            }
+
+            // 3. 要素をDOMに追加し、クリックイベントを発火させてファイル選択ダイアログを開く
+            document.body?.appendChild(fileInput)
+            fileInput.click()
+        }
     }
 }
 
