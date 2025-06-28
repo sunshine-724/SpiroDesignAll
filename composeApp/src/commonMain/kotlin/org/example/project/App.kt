@@ -157,7 +157,7 @@
                                             },
                                             onLocusAdd = { newPoint ->
                                                 locus.add(newPoint)
-                                            },
+                                            }
                                         )
                                     }
                                     is DialogScreen.PenSize -> {
@@ -294,18 +294,13 @@
             // --- 軌跡の描画 (より連続的に) ---
             if (locus.size > 1) {
                 for (i in 1 until locus.size) {
-                    println("描画された座標はlocus[$i] = ${locus[i].position}で描画された色は${locus[i].color}です")
+//                    println("描画された座標はlocus[$i] = ${locus[i].position}で描画された色は${locus[i].color}です")
                     val prevPoint = locus[i - 1]
                     val currentPoint = locus[i]
-
-                    // デバッグと問題解決のため、ここで強制的にアルファ値を1.0（不透明）に設定します。
-                    // これで、保存されていた（ただし色が化けてしまった）軌跡が表示されるはずです。
-                    val visibleColor = prevPoint.copy(color = currentPoint.color.copy(alpha = 1.0f))
 
                     // 前の点から現在の点まで、前の点の色で短い線を描画する
                     drawLine(
                         color = prevPoint.color,
-//                        color = visibleColor.color,
                         start = canvasCenter + prevPoint.position,
                         end = canvasCenter + currentPoint.position,
                         strokeWidth = pinionGearOrPenStroke.width,
@@ -373,6 +368,9 @@
             CustomButton("Save") {
                 // locusリストが空でなければ、エクスポート処理を実行
                 if (locus.isNotEmpty()) {
+                    //一時停止
+                    onPlayingChange(false)
+
                     // 1. ヘッダー行を作成
                     val csvHeader = "x,y,color_hex\n"
                     // 2. 各点のデータをCSVの1行に変換
@@ -392,6 +390,8 @@
                 }
             }
             CustomButton("Load") {
+                //一時停止
+                onPlayingChange(false)
                 scope.launch {
                     loadedDataInfo = "読み込み中..."
                     // Step 1で宣言したexpect関数を呼び出す
@@ -413,7 +413,13 @@
                     }
                 }
             }
-            CustomButton("Export") {}
+            CustomButton("Export") {
+                // 一時停止
+                onPlayingChange(false)
+                scope.launch {
+                    platform.saveCanvasAsImage("spiroDesign.png")
+                }
+            }
             CustomButton("pensize") {
                 // クリックされたら、渡された関数を呼び出して画面遷移を依頼する
                 onNavigateToPenSize()

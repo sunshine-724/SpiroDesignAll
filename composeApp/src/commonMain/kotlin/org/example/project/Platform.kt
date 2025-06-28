@@ -13,6 +13,18 @@ interface Platform{
      * @return 選択されたファイルのテキスト内容。ユーザーがキャンセルした場合はnull。
      */
     suspend fun openFileAndReadText(allowedFileExtensions: List<String> = listOf()): String?
+
+    /**
+     * 現在表示されているCanvasの内容を画像として保存する
+     * @param defaultFileName 保存する画像のデフォルトファイル名。
+     */
+    suspend fun saveCanvasAsImage(defaultFileName: String)
+
+    /*debug*/
+//    /**
+//     * キャンバスの状態をデバッグする
+//     */
+//    suspend fun debugCanvas()
 }
 
 expect fun getPlatform(): Platform

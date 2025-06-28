@@ -1,7 +1,10 @@
 package org.example.project
 import kotlinx.browser.document
 import kotlinx.browser.window
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.w3c.dom.HTMLAnchorElement
+import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.url.URL
 import org.w3c.files.Blob
@@ -96,6 +99,84 @@ class WasmPlatform: Platform {
             // 3. 要素をDOMに追加し、クリックイベントを発火させてファイル選択ダイアログを開く
             document.body?.appendChild(fileInput)
             fileInput.click()
+        }
+    }
+
+    override suspend fun saveCanvasAsImage(defaultFileName: String) {
+        // requestAnimationFrameを使って、次の描画フレームを待つ
+        suspendCancellableCoroutine<Unit> { continuation ->
+            window.requestAnimationFrame {
+                // 一番上にあるcanvas要素を習得する
+                val canvas = document.querySelector("canvas") as? HTMLCanvasElement
+                if (canvas == null) {
+                    println("Error: Canvas with ID 'ComposeTarget' not found.")
+                    continuation.resume(Unit)
+                    return@requestAnimationFrame
+                }
+
+                // この部分は正しく動作することがデバッグで証明済み
+                val dataUrl = canvas.toDataURL("image/png")
+
+                // --- ここからがダウンロード処理の最終版 ---
+                val anchor = document.createElement("a") as HTMLAnchorElement
+                anchor.href = dataUrl
+                anchor.download = defaultFileName
+                document.body?.appendChild(anchor)
+
+                // リンクをプログラムがクリックして、ダウンロードを開始
+                anchor.click()
+
+                // ダウンロード開始と同時に要素を削除すると、ダウンロードの準備が完了する前にdataURL要素を消してしまうので、少量の遅延を入れる
+                window.setTimeout({
+                    document.body?.removeChild(anchor)
+                }, 100)
+                // 後片付けが終わったら、コルーチンを再開させる
+                continuation.resume(Unit)
+            }
+        }
+    }
+
+
+    suspend fun debugCanvas() {
+        // requestAnimationFrameを使って、次の描画フレームのタイミングを待つ
+        suspendCancellableCoroutine<Unit> { continuation ->
+            window.requestAnimationFrame {
+                println("--- Canvas Debug Start ---")
+
+                val canvas = document.querySelector("canvas") as? HTMLCanvasElement
+                if (canvas == null) {
+                    println("DEBUG_ERROR: Canvas with ID 'ComposeTarget' NOT FOUND.")
+                    continuation.resume(Unit)
+                    return@requestAnimationFrame
+                }
+
+                println("Canvas Found: YES")
+                println("Canvas Dimensions: width=${canvas.width}, height=${canvas.height}")
+
+                try {
+                    // Canvasの内容を文字列データ(DataURL)に変換
+                    val dataUrl = canvas.toDataURL("image/png")
+
+                    println("Generated dataURL length: ${dataUrl.length}")
+
+                    if (dataUrl.length < 200) {
+                        println("DEBUG_WARNING: The generated dataURL is very short. This often means the canvas is empty, black, or tainted.")
+                    }
+
+                    println("--- COPY THE LINE BELOW AND PASTE IT INTO YOUR BROWSER'S ADDRESS BAR ---")
+                    // この行をコンソールに出力する
+                    println(dataUrl)
+                    println("-------------------------------------------------------------------------")
+
+                } catch (e: Error) {
+                    // セキュリティエラーなど、dataURLの取得に失敗した場合
+                    println("DEBUG_ERROR: Failed to get dataURL. This might be a security (tainted canvas) issue.")
+                    println("Error message: ${e.message}")
+                }
+
+                println("--- Canvas Debug End ---")
+                continuation.resume(Unit)
+            }
         }
     }
 }
