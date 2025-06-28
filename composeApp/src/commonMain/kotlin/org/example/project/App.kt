@@ -69,7 +69,6 @@ import kotlin.math.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.ui.tooling.preview.Preview
-
 // --- ▲▲▲ ここまで ▲▲▲ ---
 
 // アプリ起動時に一度だけプラットフォーム固有の実装を取得する
@@ -141,6 +140,7 @@ fun App() {
                                     },
                                     currentSpeed = spurSpeed,
                                     currentColor = currentColor,
+                                    locus = locus,
                                     onSpeedChange = { newSpeed ->
                                         spurSpeed = newSpeed
                                     },
@@ -286,7 +286,7 @@ fun DrawingCanvas(
         }
     ) {
         val canvasCenter = center
-        println("Speed: $speed")
+//        println("Speed: $speed")
 
         // 軌跡の描画（Pathを使うことで滑らかに）
 //        locus.forEach { pathPoint ->
@@ -345,6 +345,7 @@ private fun MainScreenContent(
     onNavigateToPenSize: () -> Unit,
     currentSpeed: Float,
     currentColor: Color,
+    locus: List<PathPoint>,
     onSpeedChange: (Float) -> Unit,
     onColorChange: (Color) -> Unit,
     onPlayingChange: (Boolean) -> Unit,
@@ -365,7 +366,23 @@ private fun MainScreenContent(
         CustomButton("Clear") {
             onDisplayClear()
         }
-        CustomButton("Save") {}
+        CustomButton("Save") {
+            // locusリストが空でなければ、エクスポート処理を実行
+            if (locus.isNotEmpty()) {
+                // 1. ヘッダー行を作成
+                val csvHeader = "x,y,color_hex\n"
+                // 2. 各点のデータをCSVの1行に変換
+                val csvRows = locus.joinToString(separator = "\n") { pathPoint ->
+                    val x = pathPoint.position.x
+                    val y = pathPoint.position.y
+                    val colorHex = platform.stringFormat("#%08X",pathPoint.color.toArgb()) // 色を16進数文字列に変換
+                    "$x,$y,$colorHex"
+                }
+
+                // 3. ヘッダーとデータを結合して、ファイル保存関数を呼び出す
+                platform.saveTextToFile(csvHeader + csvRows, "locus_data.csv")
+            }
+        }
         CustomButton("Load") {}
         CustomButton("Export") {}
         CustomButton("pensize") {
