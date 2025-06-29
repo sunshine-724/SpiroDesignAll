@@ -87,6 +87,7 @@
     // DrawingCanvasの上など、関数の外に定義します
     data class PathPoint(
         val position: Offset,
+        val thickness: Float,
         val color: Color
     )
 
@@ -243,7 +244,6 @@
         val pinionGearRadius = 50f           // 回転する円（ピニオンギア）の基本半径
 
         val spurGearStroke = Stroke(20f) // スパーギアのストローク
-        val pinionGearOrPenStroke = penSize // ピニオンギアのストローク & ペン先の直径
 
         // --- State定義 ---
         var pinionCenterOffset by remember { mutableStateOf(Offset.Zero) } //ピニオンギアの中心座標
@@ -262,7 +262,7 @@
             // 1. 固定円が転がりに影響する「内側の半径」
             val effectiveSpurGearRadius = spurGearRadius - spurGearStroke.width / 2f
             // 2. ピニオンが転がる「外側の半径」
-            val effectivePinionGearRadius = pinionGearRadius + pinionGearOrPenStroke.width / 2f
+            val effectivePinionGearRadius = pinionGearRadius + latestPenSize.width / 2f
             // 3. ピニオンの中心からペン先までの距離（今回はピニオンの内周に設定）
             val effectivePenRadius = pinionGearRadius
 
@@ -296,7 +296,7 @@
                     // 最終的なペン先の絶対座標を計算
                     penOffset = pinionCenterOffset + Offset(penRelativeX, penRelativeY)
 
-                    val newPathPoint = PathPoint(position = penOffset, color = latestColor)
+                    val newPathPoint = PathPoint(position = penOffset, color = latestColor,thickness = latestPenSize.width)
                     onAddPoint(newPathPoint) //軌跡を追加
 
                     time += 0.02f * latestSpeed
@@ -326,7 +326,7 @@
                         color = prevPoint.color,
                         start = canvasCenter + prevPoint.position,
                         end = canvasCenter + currentPoint.position,
-                        strokeWidth = pinionGearOrPenStroke.width,
+                        strokeWidth = currentPoint.thickness,
                         cap = StrokeCap.Round
                     )
                 }
@@ -345,13 +345,13 @@
                     color = Color.Red,
                     radius = pinionGearRadius,
                     center = canvasCenter + pinionCenterOffset,
-                    style = pinionGearOrPenStroke
+                    style = latestPenSize
                 )
 
                 // ペン先の描画
                 drawCircle(
                     color = latestColor,
-                    radius = pinionGearOrPenStroke.width,
+                    radius = latestPenSize.width,
                     center = canvasCenter + penOffset
                 )
             }
@@ -397,17 +397,18 @@
                     onPlayingChange(false)
 
                     // 1. ヘッダー行を作成
-                    val csvHeader = "x,y,color_hex\n"
+                    val csvHeader = "x,y,thickness,color_hex\n"
                     // 2. 各点のデータをCSVの1行に変換
                     val csvRows = locus.joinToString(separator = "\n") { pathPoint ->
                         val x = pathPoint.position.x
                         val y = pathPoint.position.y
+                        val thickness = pathPoint.thickness
                         // ColorオブジェクトからR,G,Bのfloat値(0.0f〜1.0f)を取得
                         val r = pathPoint.color.red
                         val g = pathPoint.color.green
                         val b = pathPoint.color.blue
                         // 新しい形式で文字列を結合
-                        "$x,$y,$r,$g,$b"
+                        "$x,$y,$thickness,$r,$g,$b"
                     }
 
                     // 3. ヘッダーとデータを結合して、ファイル保存関数を呼び出す
@@ -423,7 +424,6 @@
                     val fileContent = platform.openFileAndReadText(listOf(".csv"))
 
                     if (fileContent != null) {
-                        // Step 1の共有ロジックでCSVをパース
                         val pathPoints = parseCsv(fileContent)
                         if(pathPoints.isNotEmpty()){
                             pathPoints.forEach { pathPoint ->
@@ -493,7 +493,7 @@
         onNavigateBack: () -> Unit
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp) // 要素間のスペース
         ) {

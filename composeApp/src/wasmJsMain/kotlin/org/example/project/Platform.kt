@@ -114,7 +114,6 @@ class WasmPlatform: Platform {
                     return@requestAnimationFrame
                 }
 
-                // この部分は正しく動作することがデバッグで証明済み
                 val dataUrl = canvas.toDataURL("image/png")
 
                 // --- ここからがダウンロード処理の最終版 ---
