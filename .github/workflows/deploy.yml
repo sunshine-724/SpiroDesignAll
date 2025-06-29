@@ -1,0 +1,53 @@
+# GitHub Actionsワークフローの名前
+name: Deploy to GitHub Pages
+
+# このワークフローが実行されるタイミングを定義
+on:
+  push:
+    branches:
+      - main  # mainブランチにプッシュされた時に実行
+
+# 実行する一連のタスク（ジョブ）を定義
+jobs:
+  deploy:
+    runs-on: ubuntu-latest  # Ubuntuの最新環境で実行
+
+    permissions:
+      contents: read
+      pages: write      # GitHub Pagesに書き込む権限
+      id-token: write   # デプロイ認証用のトークンを書き込む権限
+
+    steps:
+      # ステップ1: リポジトリのコードをチェックアウト
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ステップ2: Java (JDK) 環境をセットアップ
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # ステップ3: Gradleの実行権限を付与
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # ステップ4: 本番用にWasmアプリをビルド
+      - name: Build with Gradle
+        run: ./gradlew :composeApp:wasmJsBrowserDistribution
+
+      # ステップ5: GitHub Pagesにアップロードする成果物（アーティファクト）を設定
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      # ステップ6: ビルドされた成果物をアーティファクトとしてアップロード
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'composeApp/build/dist/wasmJs/productionExecutable' # このフォルダの中身をアップロード
+
+      # ステップ7: 成果物をGitHub Pagesにデプロイ
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
