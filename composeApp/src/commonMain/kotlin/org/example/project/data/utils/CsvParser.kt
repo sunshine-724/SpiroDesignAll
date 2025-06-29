@@ -1,7 +1,8 @@
-package org.example.project
+package org.example.project.data.utils
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import org.example.project.data.models.PathPoint
 
 /**
  * CSV文字列をパースして、PathPointのリストに変換する共有ロジック。
