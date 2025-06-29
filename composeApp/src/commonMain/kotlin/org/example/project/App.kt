@@ -67,7 +67,10 @@
     import com.github.skydoves.colorpicker.compose.*
     import kotlin.math.*
     import kotlinx.coroutines.delay
+    import kotlinx.coroutines.flow.filter
+    import kotlinx.coroutines.flow.first
     import kotlinx.coroutines.launch
+    import kotlinx.coroutines.yield
     import org.jetbrains.compose.ui.tooling.preview.Preview
     // --- ▲▲▲ ここまで ▲▲▲ ---
 
@@ -75,7 +78,6 @@
     private val platform = getPlatform()
 
     /** 描画情報を保持するデータクラス */
-
     // ダイアログの画面状態を管理
     sealed class DialogScreen {
         object Main : DialogScreen()
@@ -117,6 +119,7 @@
         var spurSpeed by remember { mutableStateOf(1f) } // スパーギアのスピード
         var currentColor by remember { mutableStateOf(Color.Black) } //現在の軌跡の色
         var isPlaying by remember { mutableStateOf(false) } // startかstopかのフラグ
+        var isExporting by remember { mutableStateOf(false) } // エクスポート中かどうか
 
         val locus = remember { mutableStateListOf<PathPoint>() } //軌跡
 
@@ -157,6 +160,24 @@
                                             },
                                             onLocusAdd = { newPoint ->
                                                 locus.add(newPoint)
+                                            },
+                                            onDisplayExport = {
+                                                scope.launch {
+                                                    isPlaying = false
+                                                    isExporting = true
+                                                    drawerState.close()
+                                                    // snapshotFlowでisClosedプロパティを監視し、
+                                                    // その値がtrueになった最初の瞬間まで、コルーチンをここで待機させる
+                                                    snapshotFlow { drawerState.isClosed }
+                                                        .filter { isClosed -> isClosed } // isClosedがtrueの値だけを通過させるフィルター
+                                                        .first() // 最初のtrueを受け取ったら待機を完了する
+
+                                                    yield() //1フレーム待つ
+
+                                                    platform.saveCanvasAsImage("spiroDesign.png")
+                                                    isExporting = false
+                                                    drawerState.open()
+                                                }
                                             }
                                         )
                                     }
@@ -195,6 +216,7 @@
                             color = currentColor,
                             speed = spurSpeed,
                             isPlaying = isPlaying,
+                            isExporting = isExporting,
                             locus = locus,
                             penSize = Stroke(penRadius),
                             onAddPoint = { newPoint ->
@@ -214,6 +236,7 @@
         locus : List<PathPoint>,
         penSize : Stroke,
         isPlaying : Boolean,
+        isExporting : Boolean,
         onAddPoint: (PathPoint) -> Unit,
     ) {
         val spurGearRadius = 300f            // 固定円（大きい円）の基本半径
@@ -308,29 +331,30 @@
                     )
                 }
             }
+            if(!isExporting){
+                // 固定円の描画
+                drawCircle(
+                    color = Color.Blue,
+                    radius = spurGearRadius,
+                    center = canvasCenter,
+                    style = spurGearStroke
+                )
 
-            // 固定円の描画
-            drawCircle(
-                color = Color.Blue,
-                radius = spurGearRadius,
-                center = canvasCenter,
-                style = spurGearStroke
-            )
+                // 回転する円（ピニオンギア）の描画
+                drawCircle(
+                    color = Color.Red,
+                    radius = pinionGearRadius,
+                    center = canvasCenter + pinionCenterOffset,
+                    style = pinionGearOrPenStroke
+                )
 
-            // 回転する円（ピニオンギア）の描画
-            drawCircle(
-                color = Color.Red,
-                radius = pinionGearRadius,
-                center = canvasCenter + pinionCenterOffset,
-                style = pinionGearOrPenStroke
-            )
-
-            // ペン先の描画
-            drawCircle(
-                color = latestColor,
-                radius = pinionGearOrPenStroke.width,
-                center = canvasCenter + penOffset
-            )
+                // ペン先の描画
+                drawCircle(
+                    color = latestColor,
+                    radius = pinionGearOrPenStroke.width,
+                    center = canvasCenter + penOffset
+                )
+            }
         }
     }
 
@@ -345,7 +369,8 @@
         onColorChange: (Color) -> Unit,
         onPlayingChange: (Boolean) -> Unit,
         onDisplayClear: () -> Unit,
-        onLocusAdd: (PathPoint) -> Unit
+        onLocusAdd: (PathPoint) -> Unit,
+        onDisplayExport: () -> Unit
     ) {
         val controller = rememberColorPickerController()
 
@@ -414,11 +439,7 @@
                 }
             }
             CustomButton("Export") {
-                // 一時停止
-                onPlayingChange(false)
-                scope.launch {
-                    platform.saveCanvasAsImage("spiroDesign.png")
-                }
+                onDisplayExport()
             }
             CustomButton("pensize") {
                 // クリックされたら、渡された関数を呼び出して画面遷移を依頼する
