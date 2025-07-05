@@ -1,44 +1,30 @@
 // iosMain/kotlin/org/example/project/Platform.kt
 package org.example.project
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.graphics.Canvas
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asSkiaBitmap
-import androidx.compose.ui.graphics.drawscope.draw
-import kotlinx.cinterop.CValue
+import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.ObjCObjectVar
+import kotlinx.cinterop.objcPtr
 import kotlinx.cinterop.readValue
-import kotlinx.cinterop.readValues
 import kotlinx.cinterop.useContents
-import kotlinx.cinterop.usePinned
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.example.project.data.models.DeviceType
-import org.jetbrains.skia.Data
-import org.jetbrains.skia.EncodedImageFormat
-import org.jetbrains.skia.Image
-import platform.CoreGraphics.CGRect
-import platform.CoreGraphics.CGSize
-import platform.CoreGraphics.CGSizeMake
 import platform.Foundation.*
 import platform.Photos.*
 import platform.Photos.PHPhotoLibrary.Companion.sharedPhotoLibrary
 import platform.UIKit.*
-import platform.UniformTypeIdentifiers.UTType
-import platform.UniformTypeIdentifiers.UTTypeCommaSeparatedText
+import platform.UniformTypeIdentifiers.UTTypePlainText
 import platform.darwin.NSObject
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-
+import kotlinx.coroutines.Dispatchers
+import platform.UniformTypeIdentifiers.UTType
+import platform.UniformTypeIdentifiers.UTTypeCommaSeparatedText
 
 class IOSPlatform: Platform {
     override val name: String = "iOS"
+    private var documentPickerDelegate: DocumentPickerDelegate? = null // GCされないようにフィールドでデリゲートを保持
 
     override fun showGreeting(name: String) {
         // 簡単なアラート表示には UIAlertController を使用
@@ -50,31 +36,60 @@ class IOSPlatform: Platform {
         alert.addAction(UIAlertAction.actionWithTitle("OK", style = UIAlertActionStyleDefault, handler = null))
 
         // 最前面のビューコントローラにアラートを表示
-        UIApplication.sharedApplication.keyWindow?.rootViewController?.presentViewController(alert, animated = true, completion = null)
+        UIApplication.sharedApplication.keyWindow?.rootViewController?.presentViewController(
+            alert,
+            animated = true,
+            completion = null
+        )
     }
 
-    // --- saveTextToFile ---
+    /**
+     * 軌跡のデータ(csvファイル)を書き出します
+     *
+     * @param content csv形式の文字列です
+     * @param defaultFileName ファイルの名前です
+     */
     @OptIn(ExperimentalForeignApi::class)
     override fun saveTextToFile(content: String, defaultFileName: String) {
-        val fileManager = NSFileManager.defaultManager()
-        val docsDir = fileManager.URLForDirectory(
-            directory = NSDocumentDirectory,
-            inDomain = NSUserDomainMask,
-            appropriateForURL = null,
-            create = true,
-            error = null,
-        )
+        // メインスレッドでUI操作を行う
+        Dispatchers.Main.immediate.run {
+            val temporaryDirectory = NSTemporaryDirectory()
+            val temporaryFileName = NSUUID().UUIDString() + ".tmp.csv" // 一時ファイル名
+            val temporaryFilePath = temporaryDirectory + "/" + temporaryFileName
+            val temporaryFileURL = NSURL.fileURLWithPath(temporaryFilePath)
 
-        val fileURL = docsDir?.URLByAppendingPathComponent(defaultFileName)
-
-        if (fileURL != null) {
             val nsContent = content as NSString
-            try {
-                nsContent.writeToURL(fileURL, atomically = true, encoding = NSUTF8StringEncoding, error = null)
-                println("Text saved to: ${fileURL.path}")
-            } catch (e: Exception) {
-                println("Error saving text: ${e.message}")
+            var error: CPointer<ObjCObjectVar<NSError?>>? = null
+
+            // 一時ファイルにコンテンツを書き込む
+            if (!nsContent.writeToURL(
+                    temporaryFileURL,
+                    atomically = true,
+                    encoding = NSUTF8StringEncoding,
+                    error = error // errorポインタを渡してエラー情報を受け取る
+                )
+            ) {
+                // エラーが発生した場合
+                val errorMessage = error ?: "Unknown error creating temporary file."
+                println("Error creating temporary file: $errorMessage")
+                return // ここで処理を終了
             }
+
+            // 一時ファイルのURLをUIDocumentPickerViewControllerに渡す
+            val picker = UIDocumentPickerViewController(
+                forExportingURLs = listOf(temporaryFileURL)
+            )
+
+            // デリゲートを設定
+            documentPickerDelegate = DocumentPickerDelegate()
+            picker.delegate = documentPickerDelegate
+
+            // ユーザーに提示
+            UIApplication.sharedApplication.keyWindow?.rootViewController?.presentViewController(
+                picker,
+                animated = true,
+                completion = null
+            )
         }
     }
 
@@ -148,12 +163,12 @@ class IOSPlatform: Platform {
     // --- saveCanvasAsImage ---
     @OptIn(ExperimentalForeignApi::class)
     override suspend fun saveCanvasAsImage(defaultFileName: String) {
-        // 現在のウィンドウのスクリーンショットを撮る（一般的な方法の例）
+        // 現在のウィンドウのスクリーンショットを撮る
         val window = UIApplication.sharedApplication.keyWindow ?: return
         val scale = UIScreen.mainScreen.scale
         val bounds = window.bounds
 
-        UIGraphicsBeginImageContextWithOptions(bounds.useContents{size.readValue()}, false, scale)
+        UIGraphicsBeginImageContextWithOptions(bounds.useContents { size.readValue() }, false, scale)
         window.drawViewHierarchyInRect(bounds, afterScreenUpdates = true)
         val image = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
@@ -196,67 +211,9 @@ class IOSPlatform: Platform {
     override fun getDeviceType(): DeviceType {
         return DeviceType.IOS
     }
-
-//    @Composable
-//    @OptIn(ExperimentalForeignApi::class)
-//    fun ComponentToImageBitmap(
-//        modifier: Modifier = Modifier,
-//        content: @Composable () -> Unit,
-//    ): ImageBitmap? {
-//        var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-//
-//        // Wait until drawing is complete. Can be removed if content doesn't contain LaunchedEffect etc.
-//        var waited by remember { mutableStateOf(false) }
-//        LaunchedEffect(Unit) {
-//            delay(500)
-//            waited = true
-//        }
-//
-//        Column(
-//            modifier =
-//                modifier
-//                    .drawWithCache {
-//                        val width = this.size.width.toInt()
-//                        val height = this.size.height.toInt()
-//
-//                        val newImageBitmap = ImageBitmap(width, height)
-//                        val canvas = Canvas(newImageBitmap)
-//
-//                        if (waited) {
-//                            onDrawWithContent {
-//                                imageBitmap = newImageBitmap
-//                                draw(this, this.layoutDirection, canvas, this.size) {
-//                                    this@onDrawWithContent.drawContent()
-//                                }
-//                            }
-//                        } else {
-//                            onDrawWithContent {
-//                                // Wait for content to be ready
-//                            }
-//                        }
-//                    },
-//        ) {
-//            content()
-//        }
-//        return imageBitmap
-//    }
 }
 
 actual fun getPlatform(): Platform = IOSPlatform()
-
-
-@OptIn(ExperimentalForeignApi::class)
-fun convertImageBitmapToUIImage(imageBitmap: ImageBitmap) : UIImage {
-    val skiaImage = Image.makeFromBitmap(imageBitmap.asSkiaBitmap())
-    val pngData: Data? = skiaImage.encodeToData(EncodedImageFormat.PNG)
-    val pngBytes = pngData?.bytes ?: throw Exception("Failed to encode ImageBitmap to PNG")
-
-    val nsData =
-        pngBytes.usePinned { pinned ->
-            NSData.dataWithBytes(pinned.addressOf(0), pngBytes.size.toULong())
-        }
-    return UIImage(data = nsData)
-}
 
 // associated objectを作成するためのヘルパー関数 (openFileAndReadTextのデリゲート用)
 // 実際のアプリケーションでは、より堅牢なデリゲート管理戦略を検討してください。
@@ -268,4 +225,28 @@ fun UIApplication.setAssociatedObject(value: Any?, key: String) {
     // 簡単な概念実証では、静的な可変マップを使用することもできますが、メモリリークに注意が必要です。
     // より適切な解決策は、UIKitのデリゲートパターンと統合することです。
     // 現在のところ、これは概念的なプレースホルダーです。
+}
+
+/**
+ * ドキュメントのメニュー画面のデリゲートを管理するクラス(コンポーネント)
+ *
+ */
+@OptIn(ExperimentalForeignApi::class)
+class DocumentPickerDelegate(
+) : NSObject(), UIDocumentPickerDelegateProtocol {
+
+//    // エクスポートモードでは、このメソッドは通常呼ばれないか、異なる使われ方をする
+//    // ユーザーが既存のファイルを上書きしようとした場合に呼ばれる可能性がある
+//    override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<NSURL>) {
+//        // エクスポートモードでは、このコールバックは通常必要ない
+//        // ユーザーが選択した場所への保存は、ピッカーが提供された一時ファイルを移動することで行われる
+//        println("documentPicker: didPickDocumentsAtURLs called (should not be for export mode).")
+//        controller.dismissViewControllerAnimated(true, completion = null)
+//        println("File operation completed (check system behavior for actual save).")
+//    }
+
+    override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
+        println("Document picker was cancelled.")
+        controller.dismissViewControllerAnimated(true, completion = null)
+    }
 }
