@@ -13,8 +13,18 @@ import org.example.project.data.models.AppState
 import org.example.project.data.models.DialogScreen
 import org.example.project.data.models.PathPoint
 
+/**
+ * 設定画面を構築するメソッドです
+ *
+ * @param appState
+ * @param locus
+ * @param onStateChange
+ * @param onLocusAdd
+ * @param onDisplayClear
+ * @param onDisplayExport
+ */
 @Composable
-public fun DrawerContent(
+fun DrawerContent(
     appState: AppState,
     locus: MutableList<PathPoint>,
     onStateChange: (AppState) -> Unit,

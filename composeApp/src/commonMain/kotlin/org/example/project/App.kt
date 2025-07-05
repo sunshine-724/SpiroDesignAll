@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.*
@@ -19,8 +20,10 @@ import androidx.compose.ui.platform.*
 import androidx.compose.ui.unit.*
 import com.github.skydoves.colorpicker.compose.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.example.project.data.models.AppState
+import org.example.project.data.models.DeviceType.*
 import org.example.project.data.models.PathPoint
 import org.example.project.data.utils.handleExportAction
 import org.example.project.ui.components.DrawingCanvas
@@ -34,11 +37,18 @@ import kotlin.math.*
 val platform = getPlatform()
 
 
+/**
+ * App
+ *
+ */
 @Preview
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun App() {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed) // 設定画面を開いているか閉じているかどうか(PC用)
+    var showBottomSheet by remember { mutableStateOf(false) } // 設定画面が開いているか閉じているかどうか(モバイル用)
+    var capturedImageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+
     val scope = rememberCoroutineScope()
 
     // アプリケーション状態を管理
@@ -49,36 +59,135 @@ fun App() {
 
     AppTheme {
         Column(modifier = Modifier.fillMaxSize()) {
-            ModalNavigationDrawer(
-                drawerState = drawerState,
-                drawerContent = {
-                    DrawerContent(
-                        appState = appState,
-                        locus = locus,
-                        onStateChange = { newState -> appState = newState },
-                        onLocusAdd = { newPoint -> locus.add(newPoint) },
-                        onDisplayClear = {
-                            appState = appState.copy(isPlaying = false)
-                            locus.clear()
-                        },
-                        onDisplayExport = {
-                            handleExportAction(
-                                scope = scope,
-                                drawerState = drawerState,
+            when(platform.getDeviceType()) {
+                DESKTOP ->
+                    ModalNavigationDrawer(
+                        drawerState = drawerState,
+                        drawerContent = {
+                            DrawerContent(
+                                appState = appState,
+                                locus = locus,
                                 onStateChange = { newState -> appState = newState },
-                                platform = platform
+                                onLocusAdd = { newPoint -> locus.add(newPoint) },
+                                onDisplayClear = {
+                                    appState = appState.copy(isPlaying = false)
+                                    locus.clear()
+                                },
+                                onDisplayExport = {
+                                    handleExportAction(
+                                        scope = scope,
+                                        drawerState = drawerState,
+                                        onStateChange = { newState -> appState = newState },
+                                        platform = platform
+                                    )
+                                }
                             )
                         }
+                    ) {
+                        MainContent(
+                            appState = appState,
+                            locus = locus,
+                            scope = scope,
+                            drawerState = drawerState,
+                            onLocusAdd = { newPoint -> locus.add(newPoint) }
+                        )
+                    }
+                IOS -> {
+                    ModalNavigationDrawer(
+                        drawerState = drawerState,
+                        drawerContent = {
+                            DrawerContent(
+                                appState = appState,
+                                locus = locus,
+                                onStateChange = { newState -> appState = newState },
+                                onLocusAdd = { newPoint -> locus.add(newPoint) },
+                                onDisplayClear = {
+                                    appState = appState.copy(isPlaying = false)
+                                    locus.clear()
+                                },
+                                onDisplayExport = {
+                                    handleExportAction(
+                                        scope = scope,
+                                        drawerState = drawerState,
+                                        onStateChange = { newState -> appState = newState },
+                                        platform = platform
+                                    )
+                                }
+                            )
+                        }
+                    ) {
+                        MainContent(
+                            appState = appState,
+                            locus = locus,
+                            scope = scope,
+                            drawerState = drawerState,
+                            onLocusAdd = { newPoint -> locus.add(newPoint) }
+                        )
+                    }
+                }
+                ANDROID -> {
+                    ModalBottomSheet(
+                        onDismissRequest = { showBottomSheet = false }
+                    ) {
+                        // シート内に設定画面を描画させる
+                        DrawerContent(
+                            appState = appState,
+                            locus = locus,
+                            onStateChange = { newState -> appState = newState },
+                            onLocusAdd = { newPoint -> locus.add(newPoint) },
+                            onDisplayClear = {
+                                appState = appState.copy(isPlaying = false)
+                                locus.clear()
+                            },
+                            onDisplayExport = {
+                                handleExportAction(
+                                    scope = scope,
+                                    drawerState = drawerState,
+                                    onStateChange = { newState -> appState = newState },
+                                    platform = platform
+                                )
+                            }
+                        )
+                    }
+                    MainContent(
+                        appState = appState,
+                        locus = locus,
+                        scope = scope,
+                        drawerState = drawerState,
+                        onLocusAdd = { newPoint -> locus.add(newPoint) }
                     )
                 }
-            ) {
-                MainContent(
-                    appState = appState,
-                    locus = locus,
-                    scope = scope,
+                WEB -> ModalNavigationDrawer(
                     drawerState = drawerState,
-                    onLocusAdd = { newPoint -> locus.add(newPoint) }
-                )
+                    drawerContent = {
+                        DrawerContent(
+                            appState = appState,
+                            locus = locus,
+                            onStateChange = { newState -> appState = newState },
+                            onLocusAdd = { newPoint -> locus.add(newPoint) },
+                            onDisplayClear = {
+                                appState = appState.copy(isPlaying = false)
+                                locus.clear()
+                            },
+                            onDisplayExport = {
+                                handleExportAction(
+                                    scope = scope,
+                                    drawerState = drawerState,
+                                    onStateChange = { newState -> appState = newState },
+                                    platform = platform
+                                )
+                            }
+                        )
+                    }
+                ) {
+                    MainContent(
+                        appState = appState,
+                        locus = locus,
+                        scope = scope,
+                        drawerState = drawerState,
+                        onLocusAdd = { newPoint -> locus.add(newPoint) }
+                    )
+                }
             }
         }
     }
@@ -133,6 +242,13 @@ private fun MainContent(
     }
 }
 
+/**
+ * Drag info
+ *
+ * @param position
+ * @param color
+ * @param radius
+ */
 @Composable
 fun DragInfo(position: Offset, color: Color, radius: Float) {
     TODO("Not yet implemented")

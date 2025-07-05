@@ -3,6 +3,7 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import org.example.project.data.models.DeviceType
 import org.w3c.dom.HTMLAnchorElement
 import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLInputElement
@@ -133,6 +134,10 @@ class WasmPlatform: Platform {
                 continuation.resume(Unit)
             }
         }
+    }
+
+    override fun getDeviceType(): DeviceType {
+        return DeviceType.WEB
     }
 
 
