@@ -1,6 +1,7 @@
 package org.example.project.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -9,86 +10,58 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.toSize
 import kotlinx.coroutines.delay
 import org.example.project.data.models.PathPoint
-import kotlin.math.cos
-import kotlin.math.sin
+import org.example.project.data.models.AppState // AppStateをインポート
 
 @Composable
 fun DrawingCanvas(
-    color: Color,
-    speed : Float,
-    locus : List<PathPoint>,
-    penSize : Stroke,
-    isPlaying : Boolean,
-    isExporting : Boolean,
-    onAddPoint: (PathPoint) -> Unit,
+    // AppState全体を受け取る
+    appState: AppState,
+    // AppStateの更新を通知するコールバック
+    onAppStateChanged: (AppState) -> Unit,
+    // 軌跡を追加するコールバック (AppStateの更新を伴う)
+    onAddPoint: (PathPoint) -> Unit
 ) {
-    val spurGearRadius = 300f            // 固定円（大きい円）の基本半径
-    val pinionGearRadius = 50f           // 回転する円（ピニオンギア）の基本半径
+    // AppStateから必要なプロパティを直接取得し、rememberUpdatedStateで最新の状態を監視
+    val spurGear = appState.spurGear
+    val pinionGear = appState.pinionGear
+    appState.pen // Penインスタンス自体もAppStateから取得
+    val color by rememberUpdatedState(appState.currentPenColor)
+    val speed by rememberUpdatedState(appState.pinionGearSpeed)
+    val locus = appState.locus
+    val isPlaying by rememberUpdatedState(appState.isPlaying)
+    val isExporting by rememberUpdatedState(appState.isExporting)
+    val currentPenStrokeWidth by rememberUpdatedState(appState.penSize) // AppStateのpenSizeを直接使用
 
-    val spurGearStroke = Stroke(20f) // スパーギアのストローク
+    var canvasSize by remember { mutableStateOf(Size.Zero) } // キャンバスサイズ(2次元)
 
-    // --- State定義 ---
-    var pinionCenterOffset by remember { mutableStateOf(Offset.Zero) } //ピニオンギアの中心座標
-    var penOffset by remember { mutableStateOf(Offset.Zero) } //ペンの中心座標
-    var canvasSize by remember { mutableStateOf(Size.Zero) } //キャンバスサイズ(2次元)
-
-    val latestSpeed by rememberUpdatedState(speed) //毎フレームspeedを監視し変更する
-    val latestIsPlaying by rememberUpdatedState(isPlaying) // 現在のstartとstopのフラグ
-    val latestColor by rememberUpdatedState(color) //現在の色
-    val latestPenSize by rememberUpdatedState(penSize) //現在のペンのサイズ
-
-    LaunchedEffect(canvasSize) {
+    // アニメーション時間の更新をAppStatesに委譲
+    LaunchedEffect(canvasSize, isPlaying, speed) {
         if (canvasSize == Size.Zero) return@LaunchedEffect
 
-        // --- ストロークを考慮した「実効半径」を定義 ---
-        // 1. 固定円が転がりに影響する「内側の半径」
-        val effectiveSpurGearRadius = spurGearRadius - spurGearStroke.width / 2f
-        // 2. ピニオンが転がる「外側の半径」
-        val effectivePinionGearRadius = pinionGearRadius + latestPenSize.width / 2f
-        // 3. ピニオンの中心からペン先までの距離（今回はピニオンの内周に設定）
-        val effectivePenRadius = pinionGearRadius
-
-        var time = 0f
-
-        // time=0 の時の座標を計算
-        val centerInitDistance = effectiveSpurGearRadius - effectivePinionGearRadius
-        val initialPinionCenterX = centerInitDistance * cos(time)
-        val initialPinionCenterY = centerInitDistance * sin(time)
-        pinionCenterOffset = Offset(initialPinionCenterX, initialPinionCenterY)
-
-        val initialPenRotationAngle = (effectiveSpurGearRadius - effectivePinionGearRadius) / effectivePinionGearRadius * time
-        val initialPenRelativeX = effectivePenRadius * cos(initialPenRotationAngle)
-        val initialPenRelativeY = -effectivePenRadius * sin(initialPenRotationAngle)
-        penOffset = pinionCenterOffset + Offset(initialPenRelativeX, initialPenRelativeY)
-
         while (true) {
-            if(latestIsPlaying){
-                //  ピニオンギア（小さい円）の中心座標を計算
-                //  中心間の距離は「大きい円の実効半径 - 小さい円の実効半径」
-                val centerDistance = effectiveSpurGearRadius - effectivePinionGearRadius
-                val pinionCenterX = centerDistance * cos(time)
-                val pinionCenterY = centerDistance * sin(time)
-                pinionCenterOffset = Offset(pinionCenterX, pinionCenterY)
+            if (isPlaying) {
+                // AppStateのanimationTimeを更新
+                // appStateのコピーを作成し、animationTimeを更新してonAppStateChangedを呼び出す
+                onAppStateChanged(appState.copy(animationTime = appState.animationTime + (0.02f * speed)))
 
-                // ピニオンギアの中心から見た「ペン先」の相対座標を計算
-                val penRotationAngle = (effectiveSpurGearRadius - effectivePinionGearRadius) / effectivePinionGearRadius * time
-                val penRelativeX = effectivePenRadius * cos(penRotationAngle)
-                val penRelativeY = -effectivePenRadius * sin(penRotationAngle) // Yの符号をマイナスに
+                // ペンの描画位置はAppStateのcurrentPenDrawingPositionから取得
+                // このプロパティは、手動設定があればそれを優先し、なければアニメーション位置を返す
+                val currentDrawingPosition = appState.currentPenDrawingPosition
 
-                // 最終的なペン先の絶対座標を計算
-                penOffset = pinionCenterOffset + Offset(penRelativeX, penRelativeY)
-
-                val newPathPoint = PathPoint(position = penOffset, color = latestColor,thickness = latestPenSize.width)
-                onAddPoint(newPathPoint) //軌跡を追加
-
-                time += 0.02f * latestSpeed
-            }else{
+                // 軌跡を追加
+                val newPathPoint = PathPoint(
+                    position = currentDrawingPosition,
+                    color = color,
+                    thickness = currentPenStrokeWidth
+                )
+                onAddPoint(newPathPoint)
             }
-            delay(16L)
+            delay(16L) // 約60fps
         }
     }
 
@@ -103,11 +76,9 @@ fun DrawingCanvas(
         // --- 軌跡の描画 (より連続的に) ---
         if (locus.size > 1) {
             for (i in 1 until locus.size) {
-//                    println("描画された座標はlocus[$i] = ${locus[i].position}で描画された色は${locus[i].color}です")
                 val prevPoint = locus[i - 1]
                 val currentPoint = locus[i]
 
-                // 前の点から現在の点まで、前の点の色で短い線を描画する
                 drawLine(
                     color = prevPoint.color,
                     start = canvasCenter + prevPoint.position,
@@ -117,28 +88,28 @@ fun DrawingCanvas(
                 )
             }
         }
-        if(!isExporting){
-            // 固定円の描画
+        if (!isExporting) {
+            // 固定円の描画 (SpurGearオブジェクトからプロパティを取得)
             drawCircle(
                 color = Color.Blue,
-                radius = spurGearRadius,
-                center = canvasCenter,
-                style = spurGearStroke
+                radius = spurGear.radius,
+                center = canvasCenter + spurGear.position, // SpurGearのpositionを使用
+                style = spurGear.stroke // SpurGearのstrokeを使用
             )
 
-            // 回転する円（ピニオンギア）の描画
+            // 回転する円（ピニオンギア）の描画 (AppStateの計算されたアニメーション位置を使用)
             drawCircle(
                 color = Color.Red,
-                radius = pinionGearRadius,
-                center = canvasCenter + pinionCenterOffset,
-                style = latestPenSize
+                radius = pinionGear.radius,
+                center = canvasCenter + appState.animatedPinionCenterOffset, // AppStateの計算されたアニメーション位置を使用
+                style = pinionGear.pinionGearStroke // PinionGearのpinionGearStrokeを使用
             )
 
-            // ペン先の描画
+            // ペン先の描画 (AppStateのcurrentPenDrawingPositionを使用)
             drawCircle(
-                color = latestColor,
-                radius = latestPenSize.width,
-                center = canvasCenter + penOffset
+                color = color, // AppStateのcurrentPenColorを使用
+                radius = currentPenStrokeWidth, // ペン先の半径はAppStateのpenSizeを使用
+                center = canvasCenter + appState.currentPenDrawingPosition // AppStateの計算された最終的なペンの描画位置を使用
             )
         }
     }

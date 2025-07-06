@@ -9,7 +9,7 @@ import org.example.project.platform
 import org.example.project.ui.components.CustomButton
 
 @Composable
-public fun ControlButtons(
+fun ControlButtons(
     isPlaying: Boolean,
     locus: List<PathPoint>,
     onPlayingChange: (Boolean) -> Unit,

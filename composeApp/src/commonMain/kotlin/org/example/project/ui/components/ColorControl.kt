@@ -13,7 +13,7 @@ import com.github.skydoves.colorpicker.compose.ColorPickerController
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 
 @Composable
-public fun ColorControl(
+fun ColorControl(
     currentColor: Color,
     controller: ColorPickerController,
     onColorChange: (Color) -> Unit

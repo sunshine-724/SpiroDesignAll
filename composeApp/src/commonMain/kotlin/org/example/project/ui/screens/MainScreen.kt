@@ -28,7 +28,7 @@ fun MainScreenContent(
 ) {
     val controller = rememberColorPickerController()
     var loadedDataInfo by remember { mutableStateOf("CSVファイルがロードされていません。") }
-    val scope = rememberCoroutineScope()
+    rememberCoroutineScope()
 
     Column(
         modifier = Modifier.padding(16.dp).fillMaxHeight(1f),
@@ -54,18 +54,18 @@ fun MainScreenContent(
 
         // スピード設定
         SpeedControl(
-            currentSpeed = appState.spurSpeed,
+            currentSpeed = appState.pinionGearSpeed,
             onSpeedChange = { newSpeed ->
-                onStateChange(appState.copy(spurSpeed = newSpeed))
+                onStateChange(appState.copy(pinionGearSpeed = newSpeed))
             }
         )
 
         // カラー設定
         ColorControl(
-            currentColor = appState.currentColor,
+            currentColor = appState.currentPenColor,
             controller = controller,
             onColorChange = { newColor ->
-                onStateChange(appState.copy(currentColor = newColor))
+                onStateChange(appState.copy(currentPenColor = newColor))
             }
         )
     }

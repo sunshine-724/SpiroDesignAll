@@ -7,7 +7,7 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
 @Composable
-public fun SpeedControl(
+fun SpeedControl(
     currentSpeed: Float,
     onSpeedChange: (Float) -> Unit
 ) {

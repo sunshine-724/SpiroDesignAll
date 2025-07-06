@@ -10,7 +10,7 @@ import kotlinx.coroutines.yield
 import org.example.project.Platform
 import org.example.project.data.models.AppState
 
-public fun handleExportAction(
+fun handleExportAction(
     scope: CoroutineScope,
     drawerState: DrawerState,
     onStateChange: (AppState) -> Unit,

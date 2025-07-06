@@ -14,7 +14,7 @@ import org.example.project.data.models.DialogScreen
 import org.example.project.data.models.PathPoint
 
 @Composable
-public fun DrawerContent(
+fun DrawerContent(
     appState: AppState,
     locus: MutableList<PathPoint>,
     onStateChange: (AppState) -> Unit,
@@ -42,12 +42,12 @@ public fun DrawerContent(
                 }
                 is DialogScreen.PenSize -> {
                     PenSizeScreenContent(
-                        currentRadius = appState.penRadius,
+                        currentRadius = appState.penSize,
                         onPenSizeChange = { newPenSize ->
                             onStateChange(
                                 appState.copy(
                                     isPlaying = false,
-                                    penRadius = newPenSize
+                                    penSize = newPenSize
                                 )
                             )
                         },
