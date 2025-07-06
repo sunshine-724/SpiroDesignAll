@@ -10,7 +10,17 @@ import kotlinx.coroutines.yield
 import org.example.project.Platform
 import org.example.project.data.models.AppState
 
-public fun handleExportAction(
+/**
+ * 設定メニューを一度閉じて、Canvasを保存させる
+ * Canvasを保存するロジックは各プラットフォームのsaveCanvasAsImageを参照
+ *
+ * @param scope
+ * @param drawerState
+ * @param onStateChange
+ * @param platform
+ */
+
+fun handleExportAction(
     scope: CoroutineScope,
     drawerState: DrawerState,
     onStateChange: (AppState) -> Unit,

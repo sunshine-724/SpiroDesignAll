@@ -1,5 +1,9 @@
 package org.example.project
 
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import org.example.project.data.models.DeviceType
+
 interface Platform{
     val name: String
     fun showGreeting(name: String)
@@ -19,6 +23,13 @@ interface Platform{
      * @param defaultFileName 保存する画像のデフォルトファイル名。
      */
     suspend fun saveCanvasAsImage(defaultFileName: String)
+
+    /**
+     * 現在動かしているプラットフォームを返します
+     *
+     * @return
+     */
+    fun getDeviceType(): DeviceType
 
     /*debug*/
 //    /**

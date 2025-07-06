@@ -40,12 +40,13 @@ public fun ControlButtons(
             }
             platform.saveTextToFile(csvHeader + csvRows, "locus_data.csv")
         }
+        println("locus.size: ${locus.size}件のデータをセーブしました")
     }
 
     CustomButton("Load") {
         onPlayingChange(false)
         scope.launch {
-            onLoadedDataInfoChange("読み込み中...")
+            println("読み込み中...")
             val fileContent = platform.openFileAndReadText(listOf(".csv"))
 
             if (fileContent != null) {
@@ -55,12 +56,15 @@ public fun ControlButtons(
                         onLocusAdd(pathPoint)
                     }
                 }
-                onLoadedDataInfoChange("${pathPoints.size} 件のデータをロードしました。")
+                println("${pathPoints.size} 件のデータをロードしました。")
             } else {
-                onLoadedDataInfoChange("ファイルの選択がキャンセルされました。")
+                println("ファイルの選択がキャンセルされました。")
             }
         }
     }
 
-    CustomButton("Export") { onDisplayExport() }
+    CustomButton("Export") {
+        onDisplayExport()
+        println("画像を出力しました")
+    }
 }
