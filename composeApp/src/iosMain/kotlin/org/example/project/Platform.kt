@@ -1,11 +1,9 @@
 // iosMain/kotlin/org/example/project/Platform.kt
 package org.example.project
 
-import androidx.compose.runtime.*
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCObjectVar
-import kotlinx.cinterop.objcPtr
 import kotlinx.cinterop.readValue
 import kotlinx.cinterop.useContents
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -14,17 +12,23 @@ import platform.Foundation.*
 import platform.Photos.*
 import platform.Photos.PHPhotoLibrary.Companion.sharedPhotoLibrary
 import platform.UIKit.*
-import platform.UniformTypeIdentifiers.UTTypePlainText
 import platform.darwin.NSObject
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import platform.UniformTypeIdentifiers.UTType
 import platform.UniformTypeIdentifiers.UTTypeCommaSeparatedText
 
 class IOSPlatform: Platform {
     override val name: String = "iOS"
+
+    /**
+     * iPhoneでUIを操作する時のデリゲートを保持します
+     * iOSのUIは基本的にViewControllerをデリゲートで保持します
+     */
     private var documentPickerDelegate: DocumentPickerDelegate? = null // GCされないようにフィールドでデリゲートを保持
+    private var currentOpenDocumentPickerDelegate: OpenFilePickerDelegate? = null // GCされないようにフィールドでデリゲートを保持
 
     override fun showGreeting(name: String) {
         // 簡単なアラート表示には UIAlertController を使用
@@ -93,74 +97,58 @@ class IOSPlatform: Platform {
         }
     }
 
-
-    // --- openFileAndReadText ---
-    // UI操作とデリゲートが必要なため、より複雑になります
+    /**
+     * csvファイルをiPhoneプラットフォームのファイルピッカーを用いて開いて、書かれている文字列を返します
+     *
+     * @param allowedFileExtensions 開くファイルの拡張子の指定
+     * @return 選択されたファイルに書かれているデータの文字列
+     */
     @OptIn(ExperimentalForeignApi::class)
     override suspend fun openFileAndReadText(allowedFileExtensions: List<String>): String? {
-        return suspendCancellableCoroutine { continuation ->
-            val documentPickerDelegate = object : NSObject(), UIDocumentPickerDelegateProtocol {
-                override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<*>) {
-                    val url = didPickDocumentsAtURLs.firstOrNull() as? NSURL
-                    if (url != null) {
-                        val fileManager = NSFileManager.defaultManager()
-                        if (fileManager.fileExistsAtPath(url.path!!)) {
-                            try {
-                                val content = NSString.stringWithContentsOfURL(url, encoding = NSUTF8StringEncoding, error = null)
-                                continuation.resume(content)
-                            } catch (e: Exception) {
-                                println("Error reading file: ${e.message}")
-                                continuation.resume(null)
-                            }
-                        } else {
-                            println("File does not exist at path: ${url.path}")
-                            continuation.resume(null)
-                        }
-                    } else {
-                        continuation.resume(null) // ファイルが選択されなかった
+        // UI操作はメインスレッドで実行
+        return withContext(Dispatchers.Main) {
+            suspendCancellableCoroutine { continuation ->
+                currentOpenDocumentPickerDelegate = OpenFilePickerDelegate(continuation)
+
+                // 許可するファイルタイプをUTTypeに変換
+                val allowedTypes: List<UTType> = allowedFileExtensions.mapNotNull { ext ->
+                    when (ext.lowercase()) {
+                        ".csv" -> UTTypeCommaSeparatedText
+                        else -> null // 未知の拡張子は無視
                     }
                 }
 
-                override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
-                    continuation.resume(null) // ユーザーがキャンセル
+                if (allowedTypes.isEmpty()) {
+                    continuation.resume(null)
+                    currentOpenDocumentPickerDelegate = null // デリゲートを解放
+                    return@suspendCancellableCoroutine
                 }
-            }
 
-            // デリゲートが早期にデアロケートされないように参照を保持
-            // これはKotlin/Nativeにおけるデリゲートの一般的なパターンです。
-            // より堅牢な方法で、例えばViewModelや専用のクラス内でこれを保持することを検討してください。
-            // ここでは簡略化のため、現在のUIアプリケーションに一時的なプロパティとしてアタッチします。
-            // 実際のアプリでは、デリゲートのライフサイクルを注意深く管理してください。
-            val app = UIApplication.sharedApplication
-            val key = "DocumentPickerDelegate"
-            // iOSでは、delegateオブジェクトが適切に保持される必要があります。
-            // ここでは簡易的な例として、シングルトンオブジェクトに保持するか、
-            // pickerを表示するUIViewControllerがこのデリゲートへの強い参照を持つようにします。
-            // 実際のアプリでは、シングルトンを使用したり、UIViewControllerにプロパティとして持たせたりします。
-            // ここでは便宜上、UIApplicationのassociated objectを使用していますが、これはプロダクションコードでは推奨されません。
-            // 正しい実装では、呼び出し元のUIViewControllerがデリゲートをプロパティとして保持します。
-            // 例: currentViewController.documentPickerDelegate = documentPickerDelegate
-            // ここではダミーとして保持する機構を示します。
-            app.setAssociatedObject(documentPickerDelegate, key) // デリゲートの参照を保持する簡易的な方法
+                val documentPicker = UIDocumentPickerViewController(
+                    forOpeningContentTypes = allowedTypes,
+                    asCopy = false
+                )
 
-            val allowedTypes: List<UTType> = listOf(
-                UTTypeCommaSeparatedText,
-            )
+                documentPicker.delegate = currentOpenDocumentPickerDelegate
 
-            val documentPicker = UIDocumentPickerViewController(
-                forOpeningContentTypes = allowedTypes, // ".csv" -> "public.csv"
-                asCopy = true // ファイルをアプリのサンドボックスにコピーする
-            )
+                UIApplication.sharedApplication.keyWindow?.rootViewController?.presentViewController(documentPicker, animated = true, completion = null)
 
-            UIApplication.sharedApplication.keyWindow?.rootViewController?.presentViewController(documentPicker, animated = true, completion = null)
-
-            continuation.invokeOnCancellation {
-                app.setAssociatedObject(null, key) // デリゲート参照をクリーンアップ
+                // コルーチンがキャンセルされた場合のクリーンアップ
+                continuation.invokeOnCancellation {
+                    // ピッカーがまだ表示されている場合、閉じる
+                    documentPicker.dismissViewControllerAnimated(true, completion = null)
+                    currentOpenDocumentPickerDelegate = null // デリゲートを解放
+                }
             }
         }
     }
 
-    // --- saveCanvasAsImage ---
+    /**
+     * 現在写っている画面のスクリーンショットを撮る
+     * スクリーンショットの保存先はiPhoneのデフォルトの写真アプリ
+     *
+     * @param defaultFileName ファイルの名前
+     */
     @OptIn(ExperimentalForeignApi::class)
     override suspend fun saveCanvasAsImage(defaultFileName: String) {
         // 現在のウィンドウのスクリーンショットを撮る
@@ -208,24 +196,17 @@ class IOSPlatform: Platform {
         }
     }
 
+    /**
+     * 現在実行されているデバイスを返します
+     *
+     * @return デバイスの種類
+     */
     override fun getDeviceType(): DeviceType {
         return DeviceType.IOS
     }
 }
 
 actual fun getPlatform(): Platform = IOSPlatform()
-
-// associated objectを作成するためのヘルパー関数 (openFileAndReadTextのデリゲート用)
-// 実際のアプリケーションでは、より堅牢なデリゲート管理戦略を検討してください。
-// この実装はプロダクションには適していません。
-fun UIApplication.setAssociatedObject(value: Any?, key: String) {
-    // これは簡略化されたアプローチです。プロダクションアプリでは、
-    // <objc/runtime.h> の objc_setAssociatedObject を使用するか、
-    // ビューコントローラ内の強い参照を通じてデリゲートを管理します。
-    // 簡単な概念実証では、静的な可変マップを使用することもできますが、メモリリークに注意が必要です。
-    // より適切な解決策は、UIKitのデリゲートパターンと統合することです。
-    // 現在のところ、これは概念的なプレースホルダーです。
-}
 
 /**
  * ドキュメントのメニュー画面のデリゲートを管理するクラス(コンポーネント)
@@ -235,18 +216,60 @@ fun UIApplication.setAssociatedObject(value: Any?, key: String) {
 class DocumentPickerDelegate(
 ) : NSObject(), UIDocumentPickerDelegateProtocol {
 
-//    // エクスポートモードでは、このメソッドは通常呼ばれないか、異なる使われ方をする
-//    // ユーザーが既存のファイルを上書きしようとした場合に呼ばれる可能性がある
-//    override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<NSURL>) {
-//        // エクスポートモードでは、このコールバックは通常必要ない
-//        // ユーザーが選択した場所への保存は、ピッカーが提供された一時ファイルを移動することで行われる
-//        println("documentPicker: didPickDocumentsAtURLs called (should not be for export mode).")
-//        controller.dismissViewControllerAnimated(true, completion = null)
-//        println("File operation completed (check system behavior for actual save).")
-//    }
-
     override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
         println("Document picker was cancelled.")
+        controller.dismissViewControllerAnimated(true, completion = null)
+    }
+}
+
+/**
+ * ドキュメントを開く操作を行うクラス(コンポーネント)
+ * 今回は単一ファイルを開くようにしています
+ * 複数ファイルを開く場合はdidPickDocumentAtURLを複数形にして、NSURLをジェネリックにしたListを宣言してください
+ *
+ * @property continuation
+ */
+
+private class OpenFilePickerDelegate(
+    private val continuation: kotlin.coroutines.Continuation<String?>
+) : NSObject(), UIDocumentPickerDelegateProtocol {
+
+    @OptIn(ExperimentalForeignApi::class)
+    override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentAtURL: NSURL) {
+        // ピッカーが閉じたら実行
+        controller.dismissViewControllerAnimated(true){
+            val url = didPickDocumentAtURL
+            if (url != null) {
+                val startedAccessing = url.startAccessingSecurityScopedResource() // iCloudなど、外部から取得したURLにアクセスする場合に必要(ただし一時的)
+                if (!startedAccessing) {
+                    println("Failed to start accessing security-scoped resource for URL: ${url.path}")
+                    continuation.resume(null)
+                    return@dismissViewControllerAnimated
+                }
+
+                val fileManager = NSFileManager.defaultManager() // UIスレッドをブロックしないように,バックグラウンドスレッドでファイル読み込み
+                if (fileManager.fileExistsAtPath(url.path!!)) {
+                    try {
+                        val content = NSString.stringWithContentsOfURL(url, encoding = NSUTF8StringEncoding, error = null)
+                        continuation.resume(content)
+                    } catch (e: Exception) {
+                        println("Error reading file: ${e.message}")
+                        continuation.resume(null)
+                    } finally {
+                        // セキュリティスコープの終了
+                        url.stopAccessingSecurityScopedResource()
+                    }
+                } else {
+                    println("File does not exist at path: ${url.path}")
+                    continuation.resume(null)
+                }
+            } else {
+                continuation.resume(null) // ファイルが選択されなかった
+            }
+        }
+    }
+
+    override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
         controller.dismissViewControllerAnimated(true, completion = null)
     }
 }

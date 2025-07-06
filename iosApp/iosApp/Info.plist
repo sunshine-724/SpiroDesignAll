@@ -4,8 +4,5 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>作成した画像をフォトライブラリに保存するためにアクセスが必要です。</string>
 </dict>
 </plist>
