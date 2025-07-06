@@ -30,6 +30,11 @@ class IOSPlatform: Platform {
     private var documentPickerDelegate: DocumentPickerDelegate? = null // GCされないようにフィールドでデリゲートを保持
     private var currentOpenDocumentPickerDelegate: OpenFilePickerDelegate? = null // GCされないようにフィールドでデリゲートを保持
 
+    /**
+     * 各プラットフォームでのUIを用いて挨拶(デバイス名)を返します
+     *
+     * @param name 名前
+     */
     override fun showGreeting(name: String) {
         // 簡単なアラート表示には UIAlertController を使用
         val alert = UIAlertController.alertControllerWithTitle(
@@ -206,6 +211,11 @@ class IOSPlatform: Platform {
     }
 }
 
+/**
+ * IOSプラットフォーム専用の処理が記述されたインスタンスを取得できるゲッターです
+ *
+ * @return
+ */
 actual fun getPlatform(): Platform = IOSPlatform()
 
 /**

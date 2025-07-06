@@ -30,7 +30,6 @@
 ```
 ./gradlew :composeApp:installDebug
 ```
-
 インストール後、デバイスのアプリ一覧から手動でアプリを起動してください。
 ### 2. iOS (macOS必須)
    GUI (IDE)での実行  
@@ -49,6 +48,11 @@
 
 ビルドが成功したら、Finderで composeApp/iosApp/iosApp.xcworkspace を見つけ、ダブルクリックしてXcodeで開きます。
 Xcodeの画面左上でシミュレータを選択し、再生ボタン（▶️）を押してアプリを実行します。
+
+アプリ化してリリースしたい場合は以下のコマンドからできます
+```
+./gradlew :composeApp:linkReleaseFrameworkIosArm64
+```
 ### 3. Desktop (JVM)
    GUI (IDE)での実行
    IntelliJ IDEA / Fleetの画面右上にある実行構成ドロップダウンから desktopApp を選択します。
