@@ -17,7 +17,9 @@ import kotlinx.coroutines.delay
 import org.example.project.data.models.DraggingMode
 import org.example.project.data.models.DraggingMode.*
 import org.example.project.data.models.PathPoint
+import kotlin.collections.forEach
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -37,10 +39,20 @@ fun DrawingCanvas(
     val spurGearStroke = Stroke(20f) // スパーギアのストローク
 
     // 画面に描画するときに必要なパラメーター
-    var spurCenterOffset by remember { mutableStateOf(Offset.Zero) }
-    var pinionCenterOffset by remember { mutableStateOf(Offset.Zero) } //ピニオンギアの中心座標
-    var penOffset by remember { mutableStateOf(Offset.Zero) } //ペンの中心座標
+    // 中心座標は相対座標で管理する
+    var spurCenterOffset by remember { mutableStateOf(Offset.Zero) } // スパーギアの中心座標,基準はcanvasの中心座標
+    var pinionCenterOffset by remember { mutableStateOf(Offset.Zero) } // ピニオンギアの中心座標,基準はスパーギアの中心座標
+    var penOffset by remember { mutableStateOf(Offset.Zero) } // ペンの中心座標,基準はピニオンギアの中心座標
+
     var canvasSize by remember { mutableStateOf(Size.Zero) } //キャンバスサイズ(2次元)
+    val canvasCenter by remember {
+        derivedStateOf {
+            Offset(
+                canvasSize.width / 2f,
+                canvasSize.height / 2f
+            )
+        }
+    } //キャンバスの中心座標
 
     val latestSpeed by rememberUpdatedState(speed) //毎フレームspeedを監視し変更する
     val latestIsPlaying by rememberUpdatedState(isPlaying) // 現在のstartとstopのフラグ
@@ -49,16 +61,26 @@ fun DrawingCanvas(
 
     // 入力された情報を管理するパラメーター
     /**
-     * Dragging mode
+     * 今どのドラッグ状態かを管理します
      */
     var draggingMode by remember { mutableStateOf<DraggingMode>(NONE) }
 
     /**
-     * Clicked position
+     * ドラッグされた時の最初の座標を格納します
      */
     var clickedStartPosition by remember { mutableStateOf(Offset.Zero) }
 
+    /**
+     * ピニオンギアが内接しているか、外接しているかを判定します
+     * trueの時ピニオンギアは内接しています
+     */
     var isInner: Boolean = true
+
+
+    /**
+     * アニメーションの経過時間
+     */
+    var animationTime by remember { mutableStateOf(0f) }
 
 
     /**
@@ -73,7 +95,6 @@ fun DrawingCanvas(
         spurCenterOffset, pinionCenterOffset, penOffset, spurGearRadius, canvasSize
     ) {
         { absolutePosition ->
-            val canvasCenter = Offset(canvasSize.width / 2f, canvasSize.height / 2f)
             val relativePosition = absolutePosition - canvasCenter // 相対座標に変換
 
             // 各オブジェクトの中心からの距離を計算し、モードを決定
@@ -97,22 +118,20 @@ fun DrawingCanvas(
             println("DEBUG: Pinion Center Offset: $pinionCenterOffset, Distance to tap: $pinionCenterDistance")
             println("DEBUG: Pen Offset: $penOffset, Distance to tap: $penDistance")
 
-
             // スパーギアの中心を移動
             if ((relativePosition - spurCenterOffset).getDistance() <= tolerance) {
                 MOVE_SPUR_CENTER
             }
             // スパーギアの半径を変更
-            // 円周付近をクリックした場合
             else if (abs((relativePosition - spurCenterOffset).getDistance() - spurGearRadius) <= tolerance) {
                 RESIZE_SPUR_RADIUS
             }
             // ピニオンギアの中心を移動
-            else if ((relativePosition - pinionCenterOffset).getDistance() <= tolerance) {
+            else if ((relativePosition - (pinionCenterOffset + spurCenterOffset)).getDistance() <= tolerance) {
                 RESIZE_PINION_RADIUS_AND_MOVE_CENTER
             }
             // ペンを移動
-            else if ((relativePosition - penOffset).getDistance() <= tolerance) {
+            else if ((relativePosition - (penOffset + pinionCenterOffset + spurCenterOffset)).getDistance() <= tolerance) {
                 MOVE_PEN // ペンを直接動かすモードを追加
             }
             // 何もヒットしない場合はパン（全体移動）
@@ -126,30 +145,35 @@ fun DrawingCanvas(
      * Execute dragging
      */
     val executeDragging: (DraggingMode, Offset, Offset) -> Unit = remember(
-        spurGearRadius, spurCenterOffset, pinionGearRadius, pinionCenterOffset, penOffset
+        spurGearRadius, spurCenterOffset, pinionGearRadius, pinionCenterOffset, penOffset, locus, latestPenSize
     ) {
         { draggingMode, draggingAmount, absolutePosition ->
-            val canvasCenter = Offset(canvasSize.width / 2f, canvasSize.height / 2f)
-            val relativePosition = absolutePosition - canvasCenter // 相対座標に変換
+            val relativePosition = absolutePosition - canvasCenter // 相対座標に変換(基準はcanvasの中心座標)
 
             when (draggingMode) {
                 NONE -> Unit
-                MOVE_SPUR_CENTER -> {
+                MOVE_SPUR_CENTER,PAN -> {
                     spurCenterOffset += draggingAmount
-                    pinionCenterOffset += draggingAmount
                     penOffset += draggingAmount
+
+                    locus.forEach { pathPoint ->
+                        pathPoint.position += draggingAmount
+                    }
                 }
 
                 RESIZE_SPUR_RADIUS -> {
                     val oldSpurGearRadius = spurGearRadius
                     val oldPinionRadius = pinionGearRadius
 
+                    // penOffset は pinionCenterOffset からの相対位置なので、その相対位置自体をスケールさせる
+                    val oldPenRelativePositionToPinion = penOffset // ドラッグ前のペンのピニオンに対する相対位置
+
                     val newSpurRadius = (relativePosition - spurCenterOffset).getDistance()
                     spurGearRadius = newSpurRadius // スパーギアの半径を更新
 
                     val scaleRatio = if (oldSpurGearRadius != 0f) newSpurRadius / oldSpurGearRadius else 1f // 拡大、縮小倍率
 
-                    val dist = (pinionCenterOffset - spurCenterOffset).getDistance()
+                    val dist = (pinionCenterOffset - spurCenterOffset).getDistance() // pinionCenterOffsetはspurCenterOffsetからの相対座標
                     val unitVec =
                         if (dist > 1e-6f) ((pinionCenterOffset - spurCenterOffset) / dist) else return@remember // ゼロ除算回避
 
@@ -160,124 +184,141 @@ fun DrawingCanvas(
                         newSpurRadius + pinionGearRadius
                     }
 
-                    val newPinionCenter = spurCenterOffset + unitVec * (centerDistance - (spurGearStroke.width / 2f)) // スパーギアのストロークも計算に反映させる
+                    // newPinionCenter は spurCenterOffset からの相対座標として計算
+                    val newPinionCenter =
+                        spurCenterOffset + unitVec * (centerDistance - (spurGearStroke.width / 2f)) // スパーギアのストロークも計算に反映させる
 
                     // データを更新
-                    penOffset = penOffset * scaleRatio
-                    pinionGearRadius = oldPinionRadius * scaleRatio
-                    pinionCenterOffset = newPinionCenter
+                    pinionGearRadius = oldPinionRadius * scaleRatio // ピニオンギアの半径をスケーリングして更新
+                    pinionCenterOffset = newPinionCenter // ピニオンギアの中心を spurCenterOffset からの相対座標として更新
+
+                    val effectiveNewPinionRadius = pinionGearRadius + latestPenSize.width / 2f // 新しい有効ペン半径
+
+                    // animationTime を使って、新しい半径と回転角度に基づいてペンの相対位置を再計算
+                    // penRotationAngle の計算式は LaunchedEffect 内と同じものを使用
+                    val newPenRotationAngle =
+                        (newSpurRadius - pinionGearRadius) / pinionGearRadius * animationTime // 新しい半径を使って計算
+                    val newPenRelativeX = effectiveNewPinionRadius * cos(newPenRotationAngle)
+                    val newPenRelativeY = -effectiveNewPinionRadius * sin(newPenRotationAngle)
+                    penOffset = Offset(newPenRelativeX, newPenRelativeY) // pinionCenterOffset からの相対位置
                 }
 
                 RESIZE_PINION_RADIUS_AND_MOVE_CENTER -> {
-                    val dist = (relativePosition - spurCenterOffset).getDistance() //クリックした座標とスパーギアの中心座標との距離
-                    if (dist < 5.0f) {
-                        return@remember
-                    }
+                    // ピニオンギアの半径(更新前)
+                    val oldPinionRadius = pinionGearRadius
 
-                    val unitVec = (relativePosition - spurCenterOffset) / dist //クリックした点からスパーギアの中心点に向けた単位ベクトル
-                    var newPinionRadius = abs(spurGearRadius - dist) // スパーギアの半径とクリックした距離の差分を取ることでピニオンギアの座標が決まる(太さは一旦無視)
+                    // スパーギアの中心から見たカーソルの相対位置
+                    val pointerFromSpurCenter = relativePosition - spurCenterOffset
+                    val distFromSpurCenter = pointerFromSpurCenter.getDistance()
 
-                    val minRadius = 100.0f // ピニオンギアの最小半径
-                    if (newPinionRadius < minRadius) {
-                        newPinionRadius = minRadius
-                    }
-
-                    val hysteresis = 2.0f;
-                    val innerLimit = spurGearRadius + (-1) * (newPinionRadius - hysteresis)
-                    val outerLimit = spurGearRadius + (+1) * (newPinionRadius - hysteresis)
-
-                    if (isInner) {
-                        if (dist >= innerLimit) isInner = false;
+                    // 新しいピニオンギアの半径を計算
+                    // 内側なら (Spur半径 - 距離)、外側なら (距離 - Spur半径)
+                    val newPinionRadius = if (isInner) {
+                        spurGearRadius - distFromSpurCenter
                     } else {
-                        if (dist <= outerLimit) isInner = true;
-                    }
+                        distFromSpurCenter - spurGearRadius
+                    }.coerceAtLeast(40f) // 最小半径を40fに制限
 
-                    val distanceFromSpurCenter = if (isInner) {
-                        spurGearRadius - (newPinionRadius + (spurGearStroke.width / 2f)) // スパーギアのストロークも計算に反映させる
+                    // 内外判定を更新
+                    isInner = distFromSpurCenter < spurGearRadius
+
+                    // 新しいピニオンギアの中心までの距離を計算
+                    val newDistanceFromSpurCenter = if (isInner) {
+                        spurGearRadius - (newPinionRadius + (spurGearStroke.width / 2f))
                     } else {
-                        spurGearRadius + (newPinionRadius + (spurGearStroke.width / 2f)) // スパーギアのストロークも計算に反映させる
+                        spurGearRadius + (newPinionRadius + (spurGearStroke.width / 2f))
                     }
 
-                    val newCenter = spurCenterOffset + unitVec * distanceFromSpurCenter
+                    // 単位ベクトルを計算して、新しい中心位置を決定
+                    val unitVec = if (distFromSpurCenter > 1e-6f) pointerFromSpurCenter / distFromSpurCenter else Offset(1f, 0f)
+                    val newPinionCenter = unitVec * (newDistanceFromSpurCenter)
 
+                    val scaleRatio = if (oldPinionRadius > 1e-6f) (newPinionRadius / oldPinionRadius) else 1f
+                    penOffset *= scaleRatio
+
+                    // データを更新
                     pinionGearRadius = newPinionRadius
-                    pinionCenterOffset = newCenter
-                    penOffset += draggingAmount
+                    pinionCenterOffset = newPinionCenter
                 }
-
                 MOVE_PEN -> {
-                    val newPenOffset = relativePosition
-                    penOffset = newPenOffset
-                }
-
-                PAN -> {
-                    spurCenterOffset += draggingAmount
-                    pinionCenterOffset += draggingAmount
-                    penOffset += draggingAmount
+                    val newPenOffset = relativePosition - (spurCenterOffset + pinionCenterOffset) // 絶対座標からピニオンギアの中心からの相対座標に変換
+                    if(abs((newPenOffset).getDistance()) <= (pinionGearRadius + (latestPenSize.width / 2f))) {
+                        penOffset = newPenOffset
+                    }
                 }
             }
         }
     }
 
-
-
+    // --- 座標の初期化用のLaunchedEffect ---
     LaunchedEffect(canvasSize) {
+        // canvasSize が確定したときに一度だけ実行される
         if (canvasSize == Size.Zero) return@LaunchedEffect
 
-        // --- ストロークを考慮した「実効半径」を定義 ---
-        // 1. 固定円が転がりに影響する「内側の半径」
+        // ピニオンギアの初期相対座標
         val effectiveSpurGearRadius = spurGearRadius - spurGearStroke.width / 2f
-        // 2. ピニオンが転がる「外側の半径」
         val effectivePinionGearRadius = pinionGearRadius + latestPenSize.width / 2f
-        // 3. ピニオンの中心からペン先までの距離（今回はピニオンの内周に設定）
         val effectivePenRadius = pinionGearRadius
 
-        var time = 0f
+        val initialTime = 0f // 初期化時の時間
 
-        /**
-         * time=0 の時の座標を計算
-         */
-        // スパーギア
-        spurCenterOffset = Offset(0f, 0f)
-
-        // ピニオンギア
         val centerInitDistance = effectiveSpurGearRadius - effectivePinionGearRadius
-        val initialPinionCenterX = centerInitDistance * cos(time)
-        val initialPinionCenterY = centerInitDistance * sin(time)
-        pinionCenterOffset = Offset(initialPinionCenterX, initialPinionCenterY)
+        val initialPinionCenterX = centerInitDistance * cos(initialTime)
+        val initialPinionCenterY = centerInitDistance * sin(initialTime)
+        pinionCenterOffset = Offset(initialPinionCenterX, initialPinionCenterY) // 相対座標で設定
 
-        // ペン
         val initialPenRotationAngle =
-            (effectiveSpurGearRadius - effectivePinionGearRadius) / effectivePinionGearRadius * time
+            (effectiveSpurGearRadius - effectivePinionGearRadius) / effectivePinionGearRadius * initialTime
         val initialPenRelativeX = effectivePenRadius * cos(initialPenRotationAngle)
         val initialPenRelativeY = -effectivePenRadius * sin(initialPenRotationAngle)
-        penOffset = pinionCenterOffset + Offset(initialPenRelativeX, initialPenRelativeY)
+        penOffset = Offset(initialPenRelativeX, initialPenRelativeY) // 相対座標で設定
+    }
 
-        while (true) {
-            if (latestIsPlaying) {
-                //  ピニオンギア（小さい円）の中心座標を計算
-                //  中心間の距離は「大きい円の実効半径 - 小さい円の実効半径」
-                val centerDistance = effectiveSpurGearRadius - effectivePinionGearRadius
-                val pinionCenterX = centerDistance * cos(time)
-                val pinionCenterY = centerDistance * sin(time)
-                pinionCenterOffset = Offset(pinionCenterX, pinionCenterY)
+    // --- アニメーションループ用のLaunchedEffect ---
+    LaunchedEffect(latestIsPlaying) {
+        if (latestIsPlaying) {
+            // 手動で設定した位置がアニメーションの開始点になる
+            val startAngle = atan2(pinionCenterOffset.y + spurCenterOffset.y, pinionCenterOffset.x + spurCenterOffset.x)
+            animationTime = startAngle
+
+            while (true) {
+                // ピニオンギア（小さい円）の中心座標を計算
+                val effectiveSpurGearRadius = spurGearRadius - spurGearStroke.width / 2f
+                val effectivePinionGearRadius = pinionGearRadius + latestPenSize.width / 2f
+                val effectivePenRadius = pinionGearRadius
+
+                // 内接か外接かで計算方法を変える
+                val centerDistance = if (isInner) {
+                    effectiveSpurGearRadius - effectivePinionGearRadius
+                } else {
+                    effectiveSpurGearRadius + effectivePinionGearRadius
+                }
+
+                val pinionCenterX = centerDistance * cos(animationTime)
+                val pinionCenterY = centerDistance * sin(animationTime)
+                pinionCenterOffset = Offset(pinionCenterX, pinionCenterY) // 相対座標の更新
 
                 // ピニオンギアの中心から見た「ペン先」の相対座標を計算
                 val penRotationAngle =
-                    (effectiveSpurGearRadius - effectivePinionGearRadius) / effectivePinionGearRadius * time
+                    (effectiveSpurGearRadius - effectivePinionGearRadius) / effectivePinionGearRadius * animationTime
                 val penRelativeX = effectivePenRadius * cos(penRotationAngle)
-                val penRelativeY = -effectivePenRadius * sin(penRotationAngle) // Yの符号をマイナスに
+                val penRelativeY = -effectivePenRadius * sin(penRotationAngle)
 
-                // 最終的なペン先の絶対座標を計算
-                penOffset = pinionCenterOffset + Offset(penRelativeX, penRelativeY)
+                penOffset = Offset(penRelativeX, penRelativeY) // 相対座標の更新
 
-                val newPathPoint = PathPoint(position = penOffset, color = latestColor, thickness = latestPenSize.width)
-                onAddPoint(newPathPoint) //軌跡を追加
+                // 軌跡の追加 (描画時には絶対座標に変換)
+                val currentPenAbsolutePosition =
+                    penOffset + pinionCenterOffset + Offset(canvasSize.width / 2f, canvasSize.height / 2f)
+                val newPathPoint = PathPoint(
+                    position = currentPenAbsolutePosition,
+                    color = latestColor,
+                    thickness = latestPenSize.width
+                )
+                onAddPoint(newPathPoint)
 
-                time += 0.02f * latestSpeed
-            } else {
+                animationTime += 0.02f * latestSpeed // 時間を進める
+                delay(16L)
             }
-            delay(16L)
         }
     }
 
@@ -334,19 +375,34 @@ fun DrawingCanvas(
                 style = spurGearStroke
             )
 
+            // 中心点の描画
+            drawCircle(
+                color = Color.Blue,
+                radius = 5.0f,
+                center = spurCenterOffset + center,
+            )
+
             // ピニオンギアの描画
             drawCircle(
                 color = Color.Red,
                 radius = pinionGearRadius,
-                center = pinionCenterOffset + center,
+                center = pinionCenterOffset + spurCenterOffset + center,
                 style = latestPenSize
             )
+
+            // 中心点の描画
+            drawCircle(
+                color = Color.Red,
+                radius = 5.0f,
+                center = pinionCenterOffset + spurCenterOffset + center,
+            )
+
 
             // ペン先の描画
             drawCircle(
                 color = latestColor,
                 radius = latestPenSize.width,
-                center = penOffset + center,
+                center = penOffset + pinionCenterOffset + center,
             )
         }
     }
