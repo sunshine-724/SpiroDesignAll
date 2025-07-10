@@ -74,7 +74,7 @@ fun DrawingCanvas(
      * ピニオンギアが内接しているか、外接しているかを判定します
      * trueの時ピニオンギアは内接しています
      */
-    var isInner: Boolean = true
+    var isInner by remember { mutableStateOf(true) }
 
 
     /**
@@ -202,7 +202,6 @@ fun DrawingCanvas(
                     val newPenRelativeY = -effectiveNewPinionRadius * sin(newPenRotationAngle)
                     penOffset = Offset(newPenRelativeX, newPenRelativeY) // pinionCenterOffset からの相対位置
                 }
-
                 RESIZE_PINION_RADIUS_AND_MOVE_CENTER -> {
                     // ピニオンギアの半径(更新前)
                     val oldPinionRadius = pinionGearRadius
@@ -278,16 +277,36 @@ fun DrawingCanvas(
     LaunchedEffect(latestIsPlaying) {
         if (latestIsPlaying) {
             // 手動で設定した位置がアニメーションの開始点になる
-            val startAngle = atan2(pinionCenterOffset.y + spurCenterOffset.y, pinionCenterOffset.x + spurCenterOffset.x)
+            // ピニオンギアの「スパーギア中心からの相対座標」を使って角度を計算する
+            val startAngle = atan2(pinionCenterOffset.y, pinionCenterOffset.x)
+            animationTime = startAngle
+
+            // アニメーション開始時の「ピニオンギア中心からのペン先の距離と角度」を記憶しておく
+            val userSetPenDistance = penOffset.getDistance()
+            val userSetPenAngle = atan2(-penOffset.y, penOffset.x)
+
+            // ストロークを考慮した実行半径を求める
+            val effectiveSpurGearRadius = spurGearRadius - spurGearStroke.width / 2f
+            val effectivePinionGearRadius = pinionGearRadius + latestPenSize.width / 2f
+
+            // 実際にピニオンギアが回る軸の半径を求める
+            val rotationRatio = if (isInner) {
+                (effectiveSpurGearRadius - effectivePinionGearRadius) / effectivePinionGearRadius
+            } else {
+                (effectiveSpurGearRadius + effectivePinionGearRadius) / effectivePinionGearRadius
+            }
+
+            val calculatedStartPenAngle = rotationRatio * startAngle
+
+            // 実際の角度と計算上の角度の差（オフセット）を計算する
+            val angleOffset = userSetPenAngle - calculatedStartPenAngle
+
             animationTime = startAngle
 
             while (true) {
-                // ピニオンギア（小さい円）の中心座標を計算
                 val effectiveSpurGearRadius = spurGearRadius - spurGearStroke.width / 2f
                 val effectivePinionGearRadius = pinionGearRadius + latestPenSize.width / 2f
-                val effectivePenRadius = pinionGearRadius
 
-                // 内接か外接かで計算方法を変える
                 val centerDistance = if (isInner) {
                     effectiveSpurGearRadius - effectivePinionGearRadius
                 } else {
@@ -296,19 +315,18 @@ fun DrawingCanvas(
 
                 val pinionCenterX = centerDistance * cos(animationTime)
                 val pinionCenterY = centerDistance * sin(animationTime)
-                pinionCenterOffset = Offset(pinionCenterX, pinionCenterY) // 相対座標の更新
+                pinionCenterOffset = Offset(pinionCenterX, pinionCenterY)
 
-                // ピニオンギアの中心から見た「ペン先」の相対座標を計算
-                val penRotationAngle =
-                    (effectiveSpurGearRadius - effectivePinionGearRadius) / effectivePinionGearRadius * animationTime
-                val penRelativeX = effectivePenRadius * cos(penRotationAngle)
-                val penRelativeY = -effectivePenRadius * sin(penRotationAngle)
+                val currentPenRotationAngle = (rotationRatio * animationTime) + angleOffset
 
-                penOffset = Offset(penRelativeX, penRelativeY) // 相対座標の更新
+                // 記憶しておいた「ユーザー設定の距離」を使ってペン先の位置を計算する
+                val penRelativeX = userSetPenDistance * cos(currentPenRotationAngle)
+                val penRelativeY = -userSetPenDistance * sin(currentPenRotationAngle)
+                penOffset = Offset(penRelativeX, penRelativeY)
 
-                // 軌跡の追加 (描画時には絶対座標に変換)
+                // 軌跡の追加 (描画時にはすべてのオフセットを足して絶対座標に変換)
                 val currentPenAbsolutePosition =
-                    penOffset + pinionCenterOffset + Offset(canvasSize.width / 2f, canvasSize.height / 2f)
+                    penOffset + pinionCenterOffset + spurCenterOffset + canvasCenter
                 val newPathPoint = PathPoint(
                     position = currentPenAbsolutePosition,
                     color = latestColor,
@@ -316,7 +334,7 @@ fun DrawingCanvas(
                 )
                 onAddPoint(newPathPoint)
 
-                animationTime += 0.02f * latestSpeed // 時間を進める
+                animationTime += 0.02f * latestSpeed
                 delay(16L)
             }
         }
