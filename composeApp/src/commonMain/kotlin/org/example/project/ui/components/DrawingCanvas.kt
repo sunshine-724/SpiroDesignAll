@@ -4,15 +4,19 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import kotlinx.coroutines.delay
 import org.example.project.data.models.DraggingMode
@@ -55,6 +59,12 @@ fun DrawingCanvas(
         }
     } //キャンバスの中心座標
 
+    /**
+     * Canvas全体の累計の拡大・縮小率を管理します
+     * 1.0fが等倍(100%)
+     */
+    var cumulativeScale by remember { mutableStateOf(1.0f) }
+
     val latestSpeed by rememberUpdatedState(speed) //毎フレームspeedを監視し変更する
     val latestIsPlaying by rememberUpdatedState(isPlaying) // 現在のstartとstopのフラグ
     val latestColor by rememberUpdatedState(color) //現在の色
@@ -79,7 +89,6 @@ fun DrawingCanvas(
      * trueの時ピニオンギアは内接しています
      */
     var isInner by remember { mutableStateOf(true) }
-
 
     /**
      * アニメーションの経過時間
@@ -177,7 +186,6 @@ fun DrawingCanvas(
                 NONE -> Unit
                 MOVE_SPUR_CENTER, PAN -> {
                     spurCenterOffset += draggingAmount
-                    penOffset += draggingAmount
 
                     locus.forEach { pathPoint ->
                         pathPoint.position += draggingAmount
@@ -186,45 +194,20 @@ fun DrawingCanvas(
 
                 RESIZE_SPUR_RADIUS -> {
                     val oldSpurGearRadius = spurGearRadius
-                    val oldPinionRadius = pinionGearRadius
-
-                    // penOffset は pinionCenterOffset からの相対位置なので、その相対位置自体をスケールさせる
-                    val oldPenRelativePositionToPinion = penOffset // ドラッグ前のペンのピニオンに対する相対位置
-
+                    // 新しい半径をカーソル位置から計算
                     val newSpurRadius = (relativePosition - spurCenterOffset).getDistance()
-                    spurGearRadius = newSpurRadius // スパーギアの半径を更新
 
-                    val scaleRatio = if (oldSpurGearRadius != 0f) newSpurRadius / oldSpurGearRadius else 1f // 拡大、縮小倍率
+                    // 半径の変化がごくわずかなら処理を中断
+                    if (abs(newSpurRadius - oldSpurGearRadius) < 0.1f) return@remember
 
-                    val dist =
-                        (pinionCenterOffset - spurCenterOffset).getDistance() // pinionCenterOffsetはspurCenterOffsetからの相対座標
-                    val unitVec =
-                        if (dist > 1e-6f) ((pinionCenterOffset - spurCenterOffset) / dist) else return@remember // ゼロ除算回避
+                    // スケーリング比率を計算
+                    val scaleRatio = newSpurRadius / oldSpurGearRadius
 
-                    // 内接円か外接円かで中心座標との距離が決まる
-                    val centerDistance = if (isInner) {
-                        newSpurRadius - pinionGearRadius
-                    } else {
-                        newSpurRadius + pinionGearRadius
-                    }
-
-                    // newPinionCenter は spurCenterOffset からの相対座標として計算
-                    val newPinionCenter =
-                        spurCenterOffset + unitVec * (centerDistance - (spurGearStroke.width / 2f)) // スパーギアのストロークも計算に反映させる
-
-                    // データを更新
-                    pinionGearRadius = oldPinionRadius * scaleRatio // ピニオンギアの半径をスケーリングして更新
-                    pinionCenterOffset = newPinionCenter // ピニオンギアの中心を spurCenterOffset からの相対座標として更新
-
-                    val effectiveNewPinionRadius = pinionGearRadius + latestPenSize.width / 2f // 新しい有効ペン半径
-
-                    // animationTime を使って、新しい半径と回転角度に基づいてペンの相対位置を再計算
-                    // penRotationAngle の計算式は LaunchedEffect 内と同じものを使用
-                    val newPenRotationAngle =
-                        (newSpurRadius - pinionGearRadius) / pinionGearRadius * animationTime // 新しい半径を使って計算
-                    val newPenRelativeX = effectiveNewPinionRadius * cos(newPenRotationAngle)
-                    val newPenRelativeY = -effectiveNewPinionRadius * sin(newPenRotationAngle)
-                    penOffset = Offset(newPenRelativeX, newPenRelativeY) // pinionCenterOffset からの相対位置
+                    // すべての関連する長さを、この比率でシンプルにスケールする
+                    spurGearRadius = newSpurRadius
+                    pinionGearRadius *= scaleRatio
+                    pinionCenterOffset *= scaleRatio
+                    penOffset *= scaleRatio
                 }
 
                 RESIZE_PINION_RADIUS_AND_MOVE_CENTER -> {
@@ -375,37 +358,91 @@ fun DrawingCanvas(
             .onSizeChanged { intSize ->
                 canvasSize = intSize.toSize()
             }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { offset ->
-                        println("Tap. Offset: $offset")
-                        if(determineTapMode(draggingMode, offset) == MOVE_PEN){
-                            val relativePosition = offset - canvasCenter
-                            val newPenOffset = relativePosition - (spurCenterOffset + pinionCenterOffset)
-                            penOffset = newPenOffset
+            .pointerInput(latestIsPlaying) {
+                if(!latestIsPlaying){
+                    detectTapGestures(
+                        onTap = { offset ->
+                            println("Tap. Offset: $offset")
+                            if(determineTapMode(draggingMode, offset) == MOVE_PEN){
+                                val relativePosition = offset - canvasCenter
+                                val newPenOffset = relativePosition - (spurCenterOffset + pinionCenterOffset)
+                                penOffset = newPenOffset
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        clickedStartPosition = offset
-                        draggingMode = determineDraggingMode(clickedStartPosition)
-                        println("Drag Start. Mode: $draggingMode, Clicked: $clickedStartPosition")
-                    },
-                    onDrag = { change, dragAmount ->
-                        if (draggingMode != NONE) {
-                            executeDragging(draggingMode, dragAmount, change.position)
-                            println("Drag. Mode: $draggingMode, Clicked: $clickedStartPosition")
+            .pointerInput(latestIsPlaying) {
+                if(!latestIsPlaying){
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            clickedStartPosition = offset
+                            draggingMode = determineDraggingMode(clickedStartPosition)
+                            println("Drag Start. Mode: $draggingMode, Clicked: $clickedStartPosition")
+                        },
+                        onDrag = { change, dragAmount ->
+                            if (draggingMode != NONE) {
+                                executeDragging(draggingMode, dragAmount, change.position)
+                                println("Drag. Mode: $draggingMode, Clicked: $clickedStartPosition")
+                            }
+                            change.consume() // イベントを消費
+                        },
+                        onDragEnd = {
+                            println("Drag End. Mode reset to NONE.")
+                            draggingMode = NONE
                         }
-                        change.consume() // イベントを消費
-                    },
-                    onDragEnd = {
-                        println("Drag End. Mode reset to NONE.")
-                        draggingMode = NONE
+                    )
+                }
+            }
+            .pointerInput(latestIsPlaying) {
+                if(!latestIsPlaying){
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type == PointerEventType.Scroll) {
+                                val scrollDelta = event.changes.first().scrollDelta.y
+                                val zoomFactor = 1.0f - scrollDelta * 0.001f
+
+                                val cursorAbsolutePosition = event.changes.first().position
+
+                                // カーソルの位置を取得（Canvas中心からの相対座標）
+                                val cursorPosition = cursorAbsolutePosition - canvasCenter
+
+                                // 以前の各種値を保持
+                                val oldSpurGearRadius = spurGearRadius
+                                val oldSpurCenterOffset = spurCenterOffset
+
+                                // 新しい半径を計算し、範囲を制限
+                                val newSpurGearRadius = (oldSpurGearRadius * zoomFactor)
+                                val actualZoomFactor = newSpurGearRadius / oldSpurGearRadius
+                                pinionCenterOffset *= actualZoomFactor // ピニオンギアの中心位置もスケールする
+
+                                if (cumulativeScale * actualZoomFactor in 0.8f..1.2f) {
+                                    cumulativeScale *= actualZoomFactor //拡大率の更新
+                                }
+
+                                // 軌跡の各点もスケーリングする
+                                locus.forEach { point ->
+                                    // カーソル位置を基準に、点の絶対座標をスケーリング
+                                    point.position =
+                                        cursorAbsolutePosition + (point.position - cursorAbsolutePosition) * actualZoomFactor
+                                }
+
+                                // 他のサイズ関連の値もスケール
+                                pinionGearRadius *= actualZoomFactor
+                                penOffset *= actualZoomFactor
+
+                                // ★カーソル位置がズレないように、スパーギアの中心座標も更新する★
+                                spurCenterOffset =
+                                    (cursorPosition * (1 - actualZoomFactor)) + (oldSpurCenterOffset * actualZoomFactor)
+
+                                // 半径を更新
+                                spurGearRadius = newSpurGearRadius
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
                     }
-                )
+                }
             }
     ) {
         // --- 軌跡の描画 (より連続的に) ---
@@ -455,13 +492,14 @@ fun DrawingCanvas(
                 center = pinionCenterOffset + spurCenterOffset + center,
             )
 
-
             // ペン先の描画
             drawCircle(
                 color = latestColor,
                 radius = latestPenSize.width,
-                center = penOffset + pinionCenterOffset + center,
+                center = penOffset + spurCenterOffset + pinionCenterOffset + center,
             )
         }
     }
+
+    println("scale: $cumulativeScale")
 }

@@ -5,6 +5,6 @@ import androidx.compose.ui.graphics.Color
 
 data class PathPoint(
     var position: Offset,
-    val thickness: Float,
+    var thickness: Float,
     val color: Color
 )
