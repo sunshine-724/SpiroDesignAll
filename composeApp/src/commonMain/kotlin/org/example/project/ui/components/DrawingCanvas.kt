@@ -2,6 +2,7 @@ package org.example.project.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -59,6 +60,9 @@ fun DrawingCanvas(
     val latestColor by rememberUpdatedState(color) //現在の色
     val latestPenSize by rememberUpdatedState(penSize) //現在のペンのサイズ(ピニオンギアのストロークと常に一致)
 
+    // 入力の判定時,許容誤差を考慮して判定する
+    val tolerance = 10.0f
+
     // 入力された情報を管理するパラメーター
     /**
      * 今どのドラッグ状態かを管理します
@@ -82,6 +86,27 @@ fun DrawingCanvas(
      */
     var animationTime by remember { mutableStateOf(0f) }
 
+    /**
+     * タッチした時の処理が記述されています
+     * @param currentDraggingMode 現在のモード
+     * @param absolutePosition タッチした時の絶対座標
+     */
+    val determineTapMode: (
+        DraggingMode,
+        Offset,
+    ) -> DraggingMode = remember(
+        spurCenterOffset, pinionCenterOffset, penOffset, spurGearRadius,pinionGearRadius,canvasSize
+    ) {
+        { currentDraggingMode,absolutePosition ->
+            println("absolutePosition - (spurCenterOffset + pinionCenterOffset + canvasCenter): ${absolutePosition - spurCenterOffset + pinionCenterOffset + canvasCenter}, pinionCenterOffset: $pinionCenterOffset")
+            println("distance: ${(absolutePosition - (spurCenterOffset + pinionCenterOffset) - pinionCenterOffset).getDistance()}, radius: $pinionGearRadius")
+            if ((absolutePosition - (spurCenterOffset + pinionCenterOffset + canvasCenter) - pinionCenterOffset).getDistance() <= pinionGearRadius + latestPenSize.width / 2f) {
+                MOVE_PEN // ペンを直接動かすモードを追加
+            }else{
+                currentDraggingMode
+            }
+        }
+    }
 
     /**
      * クリックした座標(絶対座標)からどのようなドラッグモードかを判別します
@@ -98,8 +123,6 @@ fun DrawingCanvas(
             val relativePosition = absolutePosition - canvasCenter // 相対座標に変換
 
             // 各オブジェクトの中心からの距離を計算し、モードを決定
-            // 許容誤差を考慮して判定する
-            val tolerance = 10.0f // 判定の許容範囲
 
             // デバッグ出力：絶対座標と相対座標
             println("DEBUG: Tap Absolute Position: $absolutePosition")
@@ -152,7 +175,7 @@ fun DrawingCanvas(
 
             when (draggingMode) {
                 NONE -> Unit
-                MOVE_SPUR_CENTER,PAN -> {
+                MOVE_SPUR_CENTER, PAN -> {
                     spurCenterOffset += draggingAmount
                     penOffset += draggingAmount
 
@@ -173,7 +196,8 @@ fun DrawingCanvas(
 
                     val scaleRatio = if (oldSpurGearRadius != 0f) newSpurRadius / oldSpurGearRadius else 1f // 拡大、縮小倍率
 
-                    val dist = (pinionCenterOffset - spurCenterOffset).getDistance() // pinionCenterOffsetはspurCenterOffsetからの相対座標
+                    val dist =
+                        (pinionCenterOffset - spurCenterOffset).getDistance() // pinionCenterOffsetはspurCenterOffsetからの相対座標
                     val unitVec =
                         if (dist > 1e-6f) ((pinionCenterOffset - spurCenterOffset) / dist) else return@remember // ゼロ除算回避
 
@@ -202,6 +226,7 @@ fun DrawingCanvas(
                     val newPenRelativeY = -effectiveNewPinionRadius * sin(newPenRotationAngle)
                     penOffset = Offset(newPenRelativeX, newPenRelativeY) // pinionCenterOffset からの相対位置
                 }
+
                 RESIZE_PINION_RADIUS_AND_MOVE_CENTER -> {
                     // ピニオンギアの半径(更新前)
                     val oldPinionRadius = pinionGearRadius
@@ -229,7 +254,8 @@ fun DrawingCanvas(
                     }
 
                     // 単位ベクトルを計算して、新しい中心位置を決定
-                    val unitVec = if (distFromSpurCenter > 1e-6f) pointerFromSpurCenter / distFromSpurCenter else Offset(1f, 0f)
+                    val unitVec =
+                        if (distFromSpurCenter > 1e-6f) pointerFromSpurCenter / distFromSpurCenter else Offset(1f, 0f)
                     val newPinionCenter = unitVec * (newDistanceFromSpurCenter)
 
                     val scaleRatio = if (oldPinionRadius > 1e-6f) (newPinionRadius / oldPinionRadius) else 1f
@@ -239,9 +265,11 @@ fun DrawingCanvas(
                     pinionGearRadius = newPinionRadius
                     pinionCenterOffset = newPinionCenter
                 }
+
                 MOVE_PEN -> {
-                    val newPenOffset = relativePosition - (spurCenterOffset + pinionCenterOffset) // 絶対座標からピニオンギアの中心からの相対座標に変換
-                    if(abs((newPenOffset).getDistance()) <= (pinionGearRadius + (latestPenSize.width / 2f))) {
+                    val newPenOffset =
+                        relativePosition - (spurCenterOffset + pinionCenterOffset) // 絶対座標からピニオンギアの中心からの相対座標に変換
+                    if (abs((newPenOffset).getDistance()) <= (pinionGearRadius + (latestPenSize.width / 2f))) {
                         penOffset = newPenOffset
                     }
                 }
@@ -346,6 +374,18 @@ fun DrawingCanvas(
             .fillMaxSize()
             .onSizeChanged { intSize ->
                 canvasSize = intSize.toSize()
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { offset ->
+                        println("Tap. Offset: $offset")
+                        if(determineTapMode(draggingMode, offset) == MOVE_PEN){
+                            val relativePosition = offset - canvasCenter
+                            val newPenOffset = relativePosition - (spurCenterOffset + pinionCenterOffset)
+                            penOffset = newPenOffset
+                        }
+                    }
+                )
             }
             .pointerInput(Unit) {
                 detectDragGestures(
