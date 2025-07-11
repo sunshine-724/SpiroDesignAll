@@ -4,7 +4,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 
 data class PathPoint(
-    val position: Offset,
-    val thickness: Float,
-    val color: Color
+    var position: Offset,
+    var thickness: Float,
+    val color: Color,
+
+    val isBlank: Boolean = false
 )

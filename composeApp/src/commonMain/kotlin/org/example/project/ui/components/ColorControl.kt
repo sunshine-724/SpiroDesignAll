@@ -12,6 +12,14 @@ import androidx.compose.ui.unit.sp
 import com.github.skydoves.colorpicker.compose.ColorPickerController
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 
+/**
+ * Color control
+ *
+ * @param currentColor
+ * @param controller
+ * @param onColorChange
+ * @receiver
+ */
 @Composable
 public fun ColorControl(
     currentColor: Color,

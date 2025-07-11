@@ -8,6 +8,23 @@ import org.example.project.data.utils.parseCsv
 import org.example.project.platform
 import org.example.project.ui.components.CustomButton
 
+/**
+ * Control buttons
+ *
+ * @param isPlaying
+ * @param locus
+ * @param onPlayingChange
+ * @param onDisplayClear
+ * @param onDisplayExport
+ * @param onLocusAdd
+ * @param loadedDataInfo
+ * @param onLoadedDataInfoChange
+ * @receiver
+ * @receiver
+ * @receiver
+ * @receiver
+ * @receiver
+ */
 @Composable
 public fun ControlButtons(
     isPlaying: Boolean,
