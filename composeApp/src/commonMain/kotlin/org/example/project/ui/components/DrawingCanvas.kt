@@ -4,9 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -16,7 +14,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import kotlinx.coroutines.delay
 import org.example.project.data.models.DraggingMode
@@ -34,6 +31,8 @@ fun DrawingCanvas(
     speed: Float,
     locus: List<PathPoint>,
     penSize: Stroke,
+    cumulativeScale: Float,
+    onScaleChange: (Float) -> Unit,
     isPlaying: Boolean,
     isExporting: Boolean,
     onAddPoint: (PathPoint) -> Unit,
@@ -63,8 +62,7 @@ fun DrawingCanvas(
      * Canvas全体の累計の拡大・縮小率を管理します
      * 1.0fが等倍(100%)
      */
-    var cumulativeScale by remember { mutableStateOf(1.0f) }
-
+    val latestCumulativeScale by rememberUpdatedState(cumulativeScale)
     val latestSpeed by rememberUpdatedState(speed) //毎フレームspeedを監視し変更する
     val latestIsPlaying by rememberUpdatedState(isPlaying) // 現在のstartとstopのフラグ
     val latestColor by rememberUpdatedState(color) //現在の色
@@ -417,8 +415,8 @@ fun DrawingCanvas(
                                 val actualZoomFactor = newSpurGearRadius / oldSpurGearRadius
                                 pinionCenterOffset *= actualZoomFactor // ピニオンギアの中心位置もスケールする
 
-                                if (cumulativeScale * actualZoomFactor in 0.8f..1.2f) {
-                                    cumulativeScale *= actualZoomFactor //拡大率の更新
+                                if (latestCumulativeScale * actualZoomFactor in 0.8f..1.2f) {
+                                    onScaleChange(latestCumulativeScale * actualZoomFactor) //拡大率の更新
                                 }
 
                                 // 軌跡の各点もスケーリングする
@@ -501,5 +499,5 @@ fun DrawingCanvas(
         }
     }
 
-    println("scale: $cumulativeScale")
+    println("scale: $latestCumulativeScale")
 }

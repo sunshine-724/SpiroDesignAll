@@ -22,6 +22,7 @@ import com.github.skydoves.colorpicker.compose.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.SelectClause0
 import org.example.project.data.models.AppState
 import org.example.project.data.models.DeviceType.*
 import org.example.project.data.models.PathPoint
@@ -46,8 +47,6 @@ val platform = getPlatform()
 @Composable
 fun App() {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed) // 設定画面を開いているか閉じているかどうか(PC用)
-    var showBottomSheet by remember { mutableStateOf(false) } // 設定画面が開いているか閉じているかどうか(モバイル用)
-    var capturedImageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
     val scope = rememberCoroutineScope()
 
@@ -56,6 +55,24 @@ fun App() {
         mutableStateOf(AppState())
     }
     val locus = remember { mutableStateListOf<PathPoint>() }
+
+    /**
+     * Cumulative scale 拡大率を保持します
+     */
+    var cumulativeScale by remember { mutableStateOf(1.0f) }
+    val onScaleChange: (Float) -> Unit = { scale ->
+        cumulativeScale = scale
+    }
+
+    LaunchedEffect(appState.isPlaying) {
+        // isPlayingがfalseになり、かつ軌跡が1点以上ある場合
+        if (!appState.isPlaying && locus.isNotEmpty()) {
+            // 最後の点をコピーして、色が透明なだけの新しい点を作る
+            val blankPoint = locus.last().copy(color = Color.Transparent)
+            // 軌跡の末尾に追加
+            locus.add(blankPoint)
+        }
+    }
 
     AppTheme {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -89,7 +106,9 @@ fun App() {
                             locus = locus,
                             scope = scope,
                             drawerState = drawerState,
-                            onLocusAdd = { newPoint -> locus.add(newPoint) }
+                            onLocusAdd = { newPoint -> locus.add(newPoint) },
+                            cumulativeScale = cumulativeScale,
+                            onScaleChange = onScaleChange,
                         )
                     }
                 IOS -> {
@@ -121,41 +140,13 @@ fun App() {
                             locus = locus,
                             scope = scope,
                             drawerState = drawerState,
-                            onLocusAdd = { newPoint -> locus.add(newPoint) }
+                            onLocusAdd = { newPoint -> locus.add(newPoint) },
+                            cumulativeScale = cumulativeScale,
+                            onScaleChange = onScaleChange,
                         )
                     }
                 }
                 ANDROID -> {
-                    ModalBottomSheet(
-                        onDismissRequest = { showBottomSheet = false }
-                    ) {
-                        // シート内に設定画面を描画させる
-                        DrawerContent(
-                            appState = appState,
-                            locus = locus,
-                            onStateChange = { newState -> appState = newState },
-                            onLocusAdd = { newPoint -> locus.add(newPoint) },
-                            onDisplayClear = {
-                                appState = appState.copy(isPlaying = false)
-                                locus.clear()
-                            },
-                            onDisplayExport = {
-                                handleExportAction(
-                                    scope = scope,
-                                    drawerState = drawerState,
-                                    onStateChange = { newState -> appState = newState },
-                                    platform = platform
-                                )
-                            }
-                        )
-                    }
-                    MainContent(
-                        appState = appState,
-                        locus = locus,
-                        scope = scope,
-                        drawerState = drawerState,
-                        onLocusAdd = { newPoint -> locus.add(newPoint) }
-                    )
                 }
                 WEB -> ModalNavigationDrawer(
                     drawerState = drawerState,
@@ -185,7 +176,9 @@ fun App() {
                         locus = locus,
                         scope = scope,
                         drawerState = drawerState,
-                        onLocusAdd = { newPoint -> locus.add(newPoint) }
+                        onLocusAdd = { newPoint -> locus.add(newPoint) },
+                        cumulativeScale = cumulativeScale,
+                        onScaleChange = onScaleChange,
                     )
                 }
             }
@@ -201,26 +194,13 @@ private fun MainContent(
     locus: MutableList<PathPoint>,
     scope: CoroutineScope,
     drawerState: DrawerState,
-    onLocusAdd: (PathPoint) -> Unit
+    onLocusAdd: (PathPoint) -> Unit,
+    cumulativeScale: Float,
+    onScaleChange: (Float) -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures(
-//                    onTap = { _, _ -> },
-//                    onPress = { _ -> },
-//                    onDoubleTap = { _ -> },
-//                    onLongPress = { _ -> }
-                )
-            }
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() }
-            ) {
-                // 右クリック処理を別の方法で実装する必要があります
-                scope.launch { drawerState.open() }
-            }
             .onClick(
                 matcher = PointerMatcher.mouse(PointerButton.Secondary),
                 onClick = {
@@ -237,7 +217,11 @@ private fun MainContent(
             isExporting = appState.isExporting,
             locus = locus,
             penSize = Stroke(appState.penRadius),
-            onAddPoint = onLocusAdd
+            onAddPoint = onLocusAdd,
+            cumulativeScale = cumulativeScale,
+            onScaleChange = { newScale ->
+                onScaleChange(newScale)
+            }
         )
     }
 }
