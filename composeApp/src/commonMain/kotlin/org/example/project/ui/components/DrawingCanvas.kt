@@ -16,6 +16,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.toSize
 import kotlinx.coroutines.delay
+import org.example.project.Platform
+import org.example.project.data.models.DeviceType
 import org.example.project.data.models.DraggingMode
 import org.example.project.data.models.DraggingMode.*
 import org.example.project.data.models.PathPoint
@@ -36,6 +38,8 @@ fun DrawingCanvas(
     isPlaying: Boolean,
     isExporting: Boolean,
     onAddPoint: (PathPoint) -> Unit,
+    platform: Platform,
+    onOpenMenu: () -> Unit,
 ) {
     var spurGearRadius by remember { mutableStateOf(300f) }  // 固定円（大きい円）の基本半径
     var pinionGearRadius by remember { mutableStateOf(50f) } // 回転する円（ピニオンギア）の基本半径
@@ -69,7 +73,11 @@ fun DrawingCanvas(
     val latestPenSize by rememberUpdatedState(penSize) //現在のペンのサイズ(ピニオンギアのストロークと常に一致)
 
     // 入力の判定時,許容誤差を考慮して判定する
-    val tolerance = 10.0f
+    val tolerance = if (platform.getDeviceType() == DeviceType.DESKTOP || platform.getDeviceType() == DeviceType.WEB) {
+        10.0f
+    } else {
+        45.0f
+    }
 
     // 入力された情報を管理するパラメーター
     /**
@@ -356,19 +364,35 @@ fun DrawingCanvas(
             .onSizeChanged { intSize ->
                 canvasSize = intSize.toSize()
             }
-            .pointerInput(latestIsPlaying) {
-                if(!latestIsPlaying){
-                    detectTapGestures(
-                        onTap = { offset ->
+            .pointerInput(platform) {
+                detectTapGestures(
+                    onTap = { offset ->
+                        // シングルタップは、再生中でない時だけ処理する
+                        if (!latestIsPlaying) {
                             println("Tap. Offset: $offset")
-                            if(determineTapMode(draggingMode, offset) == MOVE_PEN){
+                            if (determineTapMode(draggingMode, offset) == MOVE_PEN) {
                                 val relativePosition = offset - canvasCenter
-                                val newPenOffset = relativePosition - (spurCenterOffset + pinionCenterOffset)
-                                penOffset = newPenOffset
+                                val newPenOffset =
+                                    relativePosition - (spurCenterOffset + pinionCenterOffset)
+                                if (abs((newPenOffset).getDistance()) <= (pinionGearRadius + (latestPenSize.width / 2f))) {
+                                    penOffset = newPenOffset
+                                }
                             }
                         }
-                    )
-                }
+                    },
+                    onDoubleTap = {
+                        // ダブルタップは、再生中も常に処理する (iOS/Android)
+                        if (platform.getDeviceType() == DeviceType.IOS || platform.getDeviceType() == DeviceType.ANDROID) {
+                            onOpenMenu()
+                        }
+                    },
+                    onLongPress = {
+                        // 長押しは、再生中も常に処理する (Desktop/Web)
+                        if (platform.getDeviceType() == DeviceType.DESKTOP || platform.getDeviceType() == DeviceType.WEB) {
+                            onOpenMenu()
+                        }
+                    }
+                )
             }
             .pointerInput(latestIsPlaying) {
                 if(!latestIsPlaying){
