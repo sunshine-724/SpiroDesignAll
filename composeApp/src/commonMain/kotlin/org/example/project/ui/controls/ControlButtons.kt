@@ -9,21 +9,17 @@ import org.example.project.platform
 import org.example.project.ui.components.CustomButton
 
 /**
- * Control buttons
+ * コントロールボタンを表示するComposable関数
+ * スピログラフアプリの操作に必要なボタン群（Start、Stop、Clear、Save、Load、Export）を提供する
  *
- * @param isPlaying
- * @param locus
- * @param onPlayingChange
- * @param onDisplayClear
- * @param onDisplayExport
- * @param onLocusAdd
- * @param loadedDataInfo
- * @param onLoadedDataInfoChange
- * @receiver
- * @receiver
- * @receiver
- * @receiver
- * @receiver
+ * @param isPlaying アニメーションが再生中かどうか
+ * @param locus スピログラフの軌跡データリスト
+ * @param onPlayingChange 再生状態変更のコールバック
+ * @param onDisplayClear 画面クリアのコールバック
+ * @param onDisplayExport 画像エクスポートのコールバック
+ * @param onLocusAdd 軌跡データ追加のコールバック
+ * @param loadedDataInfo ロードされたデータの情報文字列
+ * @param onLoadedDataInfoChange データ情報変更のコールバック
  */
 @Composable
 public fun ControlButtons(
@@ -36,6 +32,9 @@ public fun ControlButtons(
     loadedDataInfo: String,
     onLoadedDataInfoChange: (String) -> Unit
 ) {
+    /**
+     * Composableスコープ内でコルーチンを実行するためのスコープ
+     */
     val scope = rememberCoroutineScope()
 
     CustomButton("Start") { onPlayingChange(true) }
@@ -45,7 +44,14 @@ public fun ControlButtons(
     CustomButton("Save") {
         if (locus.isNotEmpty()) {
             onPlayingChange(false)
+            /**
+             * CSVファイルのヘッダー行
+             */
             val csvHeader = "x,y,thickness,color_hex\n"
+            
+            /**
+             * 軌跡データをCSV形式の行に変換
+             */
             val csvRows = locus.joinToString(separator = "\n") { pathPoint ->
                 val x = pathPoint.position.x
                 val y = pathPoint.position.y
@@ -64,9 +70,15 @@ public fun ControlButtons(
         onPlayingChange(false)
         scope.launch {
             println("読み込み中...")
+            /**
+             * ファイル選択ダイアログから読み込んだCSVファイルの内容
+             */
             val fileContent = platform.openFileAndReadText(listOf(".csv"))
 
             if (fileContent != null) {
+                /**
+                 * CSVファイルをパースして軌跡データのリストに変換
+                 */
                 val pathPoints = parseCsv(fileContent)
                 if(pathPoints.isNotEmpty()){
                     pathPoints.forEach { pathPoint ->

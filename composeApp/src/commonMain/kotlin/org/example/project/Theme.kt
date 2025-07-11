@@ -11,7 +11,10 @@ import spirodesign.composeapp.generated.resources.Res
 import spirodesign.composeapp.generated.resources.notosansjp_regular
 
 /**
- * 1. Noto Sans JPフォントファミリーを定義します。
+ * Noto Sans JPフォントファミリーを定義するComposable関数
+ * アプリケーション全体で日本語テキストを美しく表示するためのフォント設定
+ * 
+ * @return Noto Sans JPフォントファミリー
  */
 @OptIn(ExperimentalResourceApi::class)
 @Composable
@@ -20,12 +23,16 @@ fun NotoSansJPFontFamily(): FontFamily = FontFamily(
 )
 
 /**
- * 2. アプリのタイポグラフィ設定を定義します。
- * ★★★ ここがMaterial 3の新しい方法です ★★★
- * Material 3のTypographyは、新しいタイポグラフィスケール（displayLargeなど）を使用します。
+ * アプリケーションのタイポグラフィ設定を定義するComposable関数
+ * Material 3の新しいタイポグラフィスケールを使用してNoto Sans JPフォントを適用
+ * 
+ * @return アプリケーション用にカスタマイズされたTypographyオブジェクト
  */
 @Composable
 fun AppTypography(): Typography {
+    /**
+     * Noto Sans JPフォントファミリーのインスタンス
+     */
     val notoSansJP = NotoSansJPFontFamily()
 
     // 各テキストスタイルにデフォルトとして新しいフォントを適用します。
@@ -50,7 +57,10 @@ fun AppTypography(): Typography {
 }
 
 /**
- * 3. アプリ全体に適用するカスタムテーマを定義します。
+ * アプリケーション全体に適用するカスタムテーマを定義するComposable関数
+ * Material 3のテーマシステムを使用してカスタムタイポグラフィを適用
+ * 
+ * @param content テーマを適用するComposableコンテンツ
  */
 @Composable
 fun AppTheme(

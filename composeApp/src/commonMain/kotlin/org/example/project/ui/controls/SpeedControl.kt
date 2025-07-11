@@ -6,6 +6,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
+/**
+ * スピード制御のためのComposable関数
+ * スライダーによってスピログラフのアニメーション速度を調整する
+ *
+ * @param currentSpeed 現在の速度値
+ * @param onSpeedChange 速度変更時のコールバック
+ */
 @Composable
 public fun SpeedControl(
     currentSpeed: Float,

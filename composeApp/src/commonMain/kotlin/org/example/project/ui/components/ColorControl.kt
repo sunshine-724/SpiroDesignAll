@@ -13,12 +13,12 @@ import com.github.skydoves.colorpicker.compose.ColorPickerController
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 
 /**
- * Color control
+ * 色選択コントロールのComposable関数
+ * 現在の色を表示し、HSVカラーピッカーで新しい色を選択できるUI要素を提供する
  *
- * @param currentColor
- * @param controller
- * @param onColorChange
- * @receiver
+ * @param currentColor 現在選択されている色
+ * @param controller カラーピッカーのコントローラー
+ * @param onColorChange 色が変更された時のコールバック
  */
 @Composable
 public fun ColorControl(

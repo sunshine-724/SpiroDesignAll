@@ -15,13 +15,31 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
 
+/**
+ * CSVコンテンツからBlobオブジェクトを作成するJavaScript関数
+ * 
+ * @param content CSV文字列コンテンツ
+ * @return 作成されたBlobオブジェクト
+ */
 @JsFun("createCsvBlob")
 external fun createCsvBlob(content: String): Blob
 
 
+/**
+ * WebAssembly (Wasm) プラットフォーム固有の実装クラス
+ * Platformインターフェースの WebAssembly 版実装を提供する
+ */
 class WasmPlatform: Platform {
+    /**
+     * プラットフォーム名
+     */
     override val name: String = "Web with Kotlin/Wasm"
 
+    /**
+     * ブラウザアラートによる挨拶表示
+     * 
+     * @param name 挨拶に表示する名前
+     */
     override fun showGreeting(name: String) {
         window.alert("Hello, $name from Wasm")
     }

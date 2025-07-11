@@ -20,20 +20,32 @@ import kotlinx.coroutines.withContext
 import platform.UniformTypeIdentifiers.UTType
 import platform.UniformTypeIdentifiers.UTTypeCommaSeparatedText
 
+/**
+ * iOS プラットフォーム固有の実装クラス
+ * Platformインターフェースの iOS 版実装を提供する
+ */
 class IOSPlatform: Platform {
+    /**
+     * プラットフォーム名
+     */
     override val name: String = "iOS"
 
     /**
-     * iPhoneでUIを操作する時のデリゲートを保持します
-     * iOSのUIは基本的にViewControllerをデリゲートで保持します
+     * iOSでUIを操作する時のドキュメントピッカーデリゲートを保持する
+     * GCされないようにフィールドでデリゲートを保持
      */
-    private var documentPickerDelegate: DocumentPickerDelegate? = null // GCされないようにフィールドでデリゲートを保持
-    private var currentOpenDocumentPickerDelegate: OpenFilePickerDelegate? = null // GCされないようにフィールドでデリゲートを保持
+    private var documentPickerDelegate: DocumentPickerDelegate? = null
+    
+    /**
+     * 現在開いているファイルピッカーのデリゲートを保持する
+     * GCされないようにフィールドでデリゲートを保持
+     */
+    private var currentOpenDocumentPickerDelegate: OpenFilePickerDelegate? = null
 
     /**
-     * 各プラットフォームでのUIを用いて挨拶(デバイス名)を返します
-     *
-     * @param name 名前
+     * iOS UIAlertControllerを使用した挨拶表示
+     * 
+     * @param name 挨拶に表示する名前
      */
     override fun showGreeting(name: String) {
         // 簡単なアラート表示には UIAlertController を使用

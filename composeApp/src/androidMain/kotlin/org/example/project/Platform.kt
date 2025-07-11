@@ -3,6 +3,10 @@ package org.example.project
 import android.content.Context
 import android.widget.Toast
 
+/**
+ * Androidアプリケーションのコンテキスト
+ * グローバルにアクセス可能なアプリケーションコンテキスト
+ */
 internal lateinit var applicationContext: Context
 
 // Platformインターフェースの定義 (もしなければ追加、または正しいものを参照)
@@ -12,10 +16,22 @@ internal lateinit var applicationContext: Context
 //     fun showGreeting(name: String)
 // }
 
-class AndroidPlatform : Platform { // クラス名のスペルを修正
+/**
+ * Android プラットフォーム固有の実装クラス
+ * Platformインターフェースの Android 版実装を提供する
+ */
+class AndroidPlatform : Platform {
+    /**
+     * プラットフォーム名
+     */
     override val name : String = "Android"
 
-    override fun showGreeting(name : String){ // メソッド名のスペースを削除
+    /**
+     * Androidトーストによる挨拶表示
+     * 
+     * @param name 挨拶に表示する名前
+     */
+    override fun showGreeting(name : String){
         Toast.makeText(
             applicationContext,
             "Hello, $name from Android!",
@@ -24,4 +40,9 @@ class AndroidPlatform : Platform { // クラス名のスペルを修正
     }
 }
 
-actual fun getPlatform(): Platform = AndroidPlatform() // クラス名のスペルを修正
+/**
+ * Android プラットフォーム用のPlatformインスタンスを返す
+ * 
+ * @return AndroidPlatformのインスタンス
+ */
+actual fun getPlatform(): Platform = AndroidPlatform()

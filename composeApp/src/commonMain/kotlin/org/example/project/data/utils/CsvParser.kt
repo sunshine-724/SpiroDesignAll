@@ -5,18 +5,29 @@ import androidx.compose.ui.graphics.Color
 import org.example.project.data.models.PathPoint
 
 /**
- * CSV文字列をパースして、PathPointのリストに変換する共有ロジック。
+ * CSV文字列をパースして、PathPointのリストに変換する共有ロジック
+ * CSVフォーマット: x,y,thickness,r,g,b（ヘッダー行を除く）
+ * 
  * @param csvContent 読み込んだCSVファイルの全内容
- * @return パースされたPathPointオブジェクトのリスト
+ * @return パースされたPathPointオブジェクトのリスト。無効な行はスキップされる
  */
 fun parseCsv(csvContent: String): List<PathPoint> {
+    /**
+     * PathPointオブジェクトのリスト
+     */
     val points = mutableListOf<PathPoint>()
-    // ヘッダー行を除外し、空行も無視する
+    
+    /**
+     * ヘッダー行を除外し、空行も無視したCSV行のリスト
+     */
     val lines = csvContent.lines().drop(1).filter { it.isNotBlank() }
 
     for (line in lines) {
+        /**
+         * CSVの1行をカンマで分割した列データ
+         */
         val columns = line.split(',')
-        // 列の数が5 (x, y, r, g, b) であることを確認
+        // 列の数が6 (x, y, thickness, r, g, b) であることを確認
         if (columns.size == 6) {
             try {
                 val point = PathPoint(

@@ -11,15 +11,15 @@ import org.example.project.Platform
 import org.example.project.data.models.AppState
 
 /**
- * 設定メニューを一度閉じて、Canvasを保存させる
- * Canvasを保存するロジックは各プラットフォームのsaveCanvasAsImageを参照
+ * 画像エクスポート処理を行うユーティリティ関数
+ * 設定メニューを一度閉じて、キャンバスを保存する
+ * キャンバス保存ロジックは各プラットフォームのsaveCanvasAsImageを参照
  *
- * @param scope
- * @param drawerState
- * @param onStateChange
- * @param platform
+ * @param scope コルーチンスコープ
+ * @param drawerState ドロワーの状態
+ * @param onStateChange アプリケーション状態変更コールバック
+ * @param platform プラットフォーム情報
  */
-
 fun handleExportAction(
     scope: CoroutineScope,
     drawerState: DrawerState,

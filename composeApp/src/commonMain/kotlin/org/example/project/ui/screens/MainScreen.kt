@@ -16,7 +16,17 @@ import org.example.project.ui.components.CustomButton
 import org.example.project.ui.controls.ControlButtons
 import org.example.project.ui.controls.SpeedControl
 
-// メイン画面のコンテンツ
+/**
+ * メイン画面のコンテンツを表示するComposable関数
+ * スピログラフアプリの設定UI（コントロールボタン、スピード調整、色選択等）を提供する
+ *
+ * @param appState アプリケーション状態
+ * @param locus 軌跡データリスト
+ * @param onStateChange アプリケーション状態変更コールバック
+ * @param onLocusAdd 軌跡データ追加コールバック
+ * @param onDisplayClear 画面クリアコールバック
+ * @param onDisplayExport 画像エクスポートコールバック
+ */
 @Composable
 fun MainScreenContent(
     appState: AppState,
@@ -26,7 +36,14 @@ fun MainScreenContent(
     onDisplayClear: () -> Unit,
     onDisplayExport: () -> Unit
 ) {
+    /**
+     * カラーピッカーのコントローラー
+     */
     val controller = rememberColorPickerController()
+    
+    /**
+     * ロードされたデータの情報を表示する文字列
+     */
     var loadedDataInfo by remember { mutableStateOf("CSVファイルがロードされていません。") }
     val scope = rememberCoroutineScope()
 

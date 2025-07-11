@@ -34,32 +34,55 @@ import kotlin.math.*
 
 // --- ▲▲▲ ここまで ▲▲▲ ---
 
-// アプリ起動時に一度だけプラットフォーム固有の実装を取得する
+/**
+ * アプリ起動時に一度だけプラットフォーム固有の実装を取得するプラットフォームオブジェクト
+ */
 val platform = getPlatform()
 
 
 /**
- * App
- *
+ * アプリケーションのメイン画面を表示するComposable関数
+ * 
+ * このComposable関数はSpiroDesignアプリのメイン画面を描画し、
+ * プラットフォーム（DESKTOP、IOS、ANDROID、WEB）に応じた
+ * レイアウトとナビゲーションドロワーを提供する
  */
 @Preview
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun App() {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed) // 設定画面を開いているか閉じているかどうか(PC用)
-
+fun App() {    /**
+     * ドロワーの状態を管理するためのState
+     * 設定画面を開いているか閉じているかどうか（PC用）
+     */
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    
+    /**
+     * Composableスコープ内でコルーチンを実行するためのスコープ
+     */
     val scope = rememberCoroutineScope()
 
-    // アプリケーション状態を管理
+    /**
+     * アプリケーション状態を管理するためのState
+     */
     var appState by remember {
         mutableStateOf(AppState())
     }
+    
+    /**
+     * スピログラフの軌跡を記録するためのリスト
+     */
     val locus = remember { mutableStateListOf<PathPoint>() }
 
     /**
-     * Cumulative scale 拡大率を保持します
+     * 累積スケール（拡大率）を保持する変数
      */
     var cumulativeScale by remember { mutableStateOf(1.0f) }
+    
+    /**
+     * スケール変更時のコールバック関数
+     * 
+     * @param scale 新しいスケール値
+     */
     val onScaleChange: (Float) -> Unit = { scale ->
         cumulativeScale = scale
     }
@@ -190,6 +213,18 @@ fun App() {
 }
 
 
+/**
+ * メインコンテンツを表示するComposable関数
+ * 
+ * @param appState アプリケーションの状態
+ * @param locus スピログラフの軌跡を記録するリスト
+ * @param scope コルーチンスコープ
+ * @param drawerState ドロワーの状態
+ * @param onLocusAdd 軌跡にポイントを追加するコールバック
+ * @param cumulativeScale 累積スケール値
+ * @param onScaleChange スケール変更コールバック
+ * @param platform プラットフォーム情報
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MainContent(
@@ -227,11 +262,11 @@ private fun MainContent(
 }
 
 /**
- * Drag info
+ * ドラッグ情報を表示するComposable関数（未実装）
  *
- * @param position
- * @param color
- * @param radius
+ * @param position ドラッグ位置
+ * @param color ドラッグ時の色
+ * @param radius ドラッグ時の半径
  */
 @Composable
 fun DragInfo(position: Offset, color: Color, radius: Float) {

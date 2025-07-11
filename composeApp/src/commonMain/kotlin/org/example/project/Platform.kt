@@ -4,9 +4,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import org.example.project.data.models.DeviceType
 
+/**
+ * プラットフォーム固有の機能を提供するインターフェース
+ * 各プラットフォーム（Android、iOS、Desktop、Web）で異なる実装を持つ
+ */
 interface Platform{
+    /**
+     * プラットフォーム名
+     */
     val name: String
+    
+    /**
+     * 挨拶メッセージを表示する
+     * 
+     * @param name 挨拶に使用する名前
+     */
     fun showGreeting(name: String)
+    
+    /**
+     * テキストをファイルに保存する
+     * 
+     * @param content 保存するテキスト内容
+     * @param defaultFileName デフォルトのファイル名
+     */
     fun saveTextToFile(content: String, defaultFileName: String)
 
     /**
@@ -25,9 +45,9 @@ interface Platform{
     suspend fun saveCanvasAsImage(defaultFileName: String)
 
     /**
-     * 現在動かしているプラットフォームを返します
+     * 現在動かしているプラットフォームのデバイスタイプを返す
      *
-     * @return
+     * @return デバイスタイプ（ANDROID、IOS、DESKTOP、WEB）
      */
     fun getDeviceType(): DeviceType
 
@@ -38,4 +58,9 @@ interface Platform{
 //    suspend fun debugCanvas()
 }
 
+/**
+ * プラットフォーム固有のPlatformインスタンスを取得する
+ * 
+ * @return 現在実行中のプラットフォームに対応するPlatformインスタンス
+ */
 expect fun getPlatform(): Platform

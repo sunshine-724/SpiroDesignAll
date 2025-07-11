@@ -7,7 +7,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-// カスタムボタンのComposable関数を定義
+/**
+ * カスタマイズされたボタンのComposable関数
+ * 白い背景に黒いテキスト、影効果を持つスタイルのボタンを作成する
+ *
+ * @param text ボタンに表示するテキスト
+ * @param onClick ボタンがクリックされた時の処理
+ */
 @Composable
 fun CustomButton(text: String, onClick: () -> Unit) {
     Button(

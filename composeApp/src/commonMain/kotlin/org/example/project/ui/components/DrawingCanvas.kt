@@ -27,6 +27,22 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 
+/**
+ * スピログラフの描画キャンバスを表示するComposable関数
+ * 歯車の設定、ドラッグ操作、アニメーション、軌跡の描画を管理する
+ *
+ * @param color 描画色
+ * @param speed アニメーション速度
+ * @param locus 軌跡データのリスト
+ * @param penSize ペンのストローク設定
+ * @param cumulativeScale 累積スケール値
+ * @param onScaleChange スケール変更コールバック
+ * @param isPlaying アニメーション再生中かどうか
+ * @param isExporting エクスポート処理中かどうか
+ * @param onAddPoint 軌跡ポイント追加コールバック
+ * @param platform プラットフォーム情報
+ * @param onOpenMenu メニューオープンコールバック
+ */
 @Composable
 fun DrawingCanvas(
     color: Color,
@@ -41,18 +57,44 @@ fun DrawingCanvas(
     platform: Platform,
     onOpenMenu: () -> Unit,
 ) {
-    var spurGearRadius by remember { mutableStateOf(300f) }  // 固定円（大きい円）の基本半径
-    var pinionGearRadius by remember { mutableStateOf(50f) } // 回転する円（ピニオンギア）の基本半径
+    /**
+     * 固定円（大きい円）の基本半径
+     */
+    var spurGearRadius by remember { mutableStateOf(300f) }
+    
+    /**
+     * 回転する円（ピニオンギア）の基本半径
+     */
+    var pinionGearRadius by remember { mutableStateOf(50f) }
 
-    val spurGearStroke = Stroke(20f) // スパーギアのストローク
+    /**
+     * スパーギアのストローク幅
+     */
+    val spurGearStroke = Stroke(20f)
 
-    // 画面に描画するときに必要なパラメーター
-    // 中心座標は相対座標で管理する
-    var spurCenterOffset by remember { mutableStateOf(Offset.Zero) } // スパーギアの中心座標,基準はcanvasの中心座標
-    var pinionCenterOffset by remember { mutableStateOf(Offset.Zero) } // ピニオンギアの中心座標,基準はスパーギアの中心座標
-    var penOffset by remember { mutableStateOf(Offset.Zero) } // ペンの中心座標,基準はピニオンギアの中心座標
+    /**
+     * スパーギアの中心座標（基準はcanvasの中心座標）
+     */
+    var spurCenterOffset by remember { mutableStateOf(Offset.Zero) }
+    
+    /**
+     * ピニオンギアの中心座標（基準はスパーギアの中心座標）
+     */
+    var pinionCenterOffset by remember { mutableStateOf(Offset.Zero) }
+    
+    /**
+     * ペンの中心座標（基準はピニオンギアの中心座標）
+     */
+    var penOffset by remember { mutableStateOf(Offset.Zero) }
 
-    var canvasSize by remember { mutableStateOf(Size.Zero) } //キャンバスサイズ(2次元)
+    /**
+     * キャンバスサイズ（2次元）
+     */
+    var canvasSize by remember { mutableStateOf(Size.Zero) }
+    
+    /**
+     * キャンバスの中心座標
+     */
     val canvasCenter by remember {
         derivedStateOf {
             Offset(
@@ -60,19 +102,37 @@ fun DrawingCanvas(
                 canvasSize.height / 2f
             )
         }
-    } //キャンバスの中心座標
+    }
 
     /**
-     * Canvas全体の累計の拡大・縮小率を管理します
-     * 1.0fが等倍(100%)
+     * 最新の累積スケール値を監視する
      */
     val latestCumulativeScale by rememberUpdatedState(cumulativeScale)
-    val latestSpeed by rememberUpdatedState(speed) //毎フレームspeedを監視し変更する
-    val latestIsPlaying by rememberUpdatedState(isPlaying) // 現在のstartとstopのフラグ
-    val latestColor by rememberUpdatedState(color) //現在の色
-    val latestPenSize by rememberUpdatedState(penSize) //現在のペンのサイズ(ピニオンギアのストロークと常に一致)
+    
+    /**
+     * 最新の速度値を監視する
+     */
+    val latestSpeed by rememberUpdatedState(speed)
+    
+    /**
+     * 現在の再生/停止フラグを監視する
+     */
+    val latestIsPlaying by rememberUpdatedState(isPlaying)
+    
+    /**
+     * 現在の描画色を監視する
+     */
+    val latestColor by rememberUpdatedState(color)
+    
+    /**
+     * 現在のペンサイズを監視する（ピニオンギアのストロークと常に一致）
+     */
+    val latestPenSize by rememberUpdatedState(penSize)
 
-    // 入力の判定時,許容誤差を考慮して判定する
+    /**
+     * 入力の判定時の許容誤差
+     * デスクトップ/Webでは10.0f、それ以外では45.0f
+     */
     val tolerance = if (platform.getDeviceType() == DeviceType.DESKTOP || platform.getDeviceType() == DeviceType.WEB) {
         10.0f
     } else {
