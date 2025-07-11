@@ -109,6 +109,7 @@ fun App() {
                             onLocusAdd = { newPoint -> locus.add(newPoint) },
                             cumulativeScale = cumulativeScale,
                             onScaleChange = onScaleChange,
+                            platform = platform,
                         )
                     }
                 IOS -> {
@@ -143,6 +144,7 @@ fun App() {
                             onLocusAdd = { newPoint -> locus.add(newPoint) },
                             cumulativeScale = cumulativeScale,
                             onScaleChange = onScaleChange,
+                            platform = platform,
                         )
                     }
                 }
@@ -179,6 +181,7 @@ fun App() {
                         onLocusAdd = { newPoint -> locus.add(newPoint) },
                         cumulativeScale = cumulativeScale,
                         onScaleChange = onScaleChange,
+                        platform = platform,
                     )
                 }
             }
@@ -196,18 +199,13 @@ private fun MainContent(
     drawerState: DrawerState,
     onLocusAdd: (PathPoint) -> Unit,
     cumulativeScale: Float,
-    onScaleChange: (Float) -> Unit
+    onScaleChange: (Float) -> Unit,
+    platform: Platform,
 ) {
+
     Box(
         modifier = Modifier
-            .fillMaxSize()
-            .onClick(
-                matcher = PointerMatcher.mouse(PointerButton.Secondary),
-                onClick = {
-                    // 右クリックでドロワーを開く
-                    scope.launch { drawerState.open() }
-                }
-            ),
+            .fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         DrawingCanvas(
@@ -221,7 +219,9 @@ private fun MainContent(
             cumulativeScale = cumulativeScale,
             onScaleChange = { newScale ->
                 onScaleChange(newScale)
-            }
+            },
+            platform = platform,
+            onOpenMenu = { scope.launch { drawerState.open() } } // ★これを追加
         )
     }
 }
