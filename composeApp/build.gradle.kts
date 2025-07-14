@@ -10,6 +10,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
+    id("org.jetbrains.dokka") version "1.9.10" // 使用するDokkaのバージョンを指定
 }
 
 kotlin {

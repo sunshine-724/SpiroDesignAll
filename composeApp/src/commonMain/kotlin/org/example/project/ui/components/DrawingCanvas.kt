@@ -3,6 +3,10 @@ package org.example.project.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.onClick
+import androidx.compose.foundation.PointerMatcher
+import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -28,6 +32,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun DrawingCanvas(
     color: Color,
     speed: Float,
@@ -364,12 +369,18 @@ fun DrawingCanvas(
             .onSizeChanged { intSize ->
                 canvasSize = intSize.toSize()
             }
-            .pointerInput(platform) {
+            .onClick(
+                enabled = (platform.getDeviceType() == DeviceType.DESKTOP || platform.getDeviceType() == DeviceType.WEB),
+                matcher = PointerMatcher.mouse(PointerButton.Secondary), // セカンダリボタン（右クリック）に限定
+                onClick = {
+                    onOpenMenu() // 右クリックでメニューを開く
+                }
+            )
+            .pointerInput(latestIsPlaying) {
                 detectTapGestures(
                     onTap = { offset ->
-                        // シングルタップは、再生中でない時だけ処理する
                         if (!latestIsPlaying) {
-                            println("Tap. Offset: $offset")
+                            // シングルタップの処理(実行中でない場合に限る)
                             if (determineTapMode(draggingMode, offset) == MOVE_PEN) {
                                 val relativePosition = offset - canvasCenter
                                 val newPenOffset =
@@ -381,14 +392,8 @@ fun DrawingCanvas(
                         }
                     },
                     onDoubleTap = {
-                        // ダブルタップは、再生中も常に処理する (iOS/Android)
+                        // ダブルタップの処理 (iOS/Android)
                         if (platform.getDeviceType() == DeviceType.IOS || platform.getDeviceType() == DeviceType.ANDROID) {
-                            onOpenMenu()
-                        }
-                    },
-                    onLongPress = {
-                        // 長押しは、再生中も常に処理する (Desktop/Web)
-                        if (platform.getDeviceType() == DeviceType.DESKTOP || platform.getDeviceType() == DeviceType.WEB) {
                             onOpenMenu()
                         }
                     }

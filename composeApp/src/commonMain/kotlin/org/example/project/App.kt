@@ -221,7 +221,7 @@ private fun MainContent(
                 onScaleChange(newScale)
             },
             platform = platform,
-            onOpenMenu = { scope.launch { drawerState.open() } } // ★これを追加
+            onOpenMenu = { scope.launch { drawerState.open() } }
         )
     }
 }
