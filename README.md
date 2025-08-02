@@ -9,11 +9,12 @@
    App StoreやGoogle Play Storeで公開すると料金取られるので、公開する予定はありません。
 
 #### デモ動画
-   #### Web版
+   #### Web版  
    https://github.com/user-attachments/assets/bdc7cf71-0901-4b31-a661-b14960fee12e
 
-   #### スマートフォン版(IPhone)
-   https://github.com/user-attachments/assets/78fd85fb-cac1-4d86-8c18-eb56fb19375e
+   #### スマートフォン版(IPhone)  
+   https://github.com/user-attachments/assets/393846a2-3150-4832-a15b-f5a8b037ca37
+
 ---
 ## アプリケーション実行ガイド(開発者向け)
 このガイドは、各プラットフォームでアプリケーションをビルドし、実行するための手順をまとめたものです。
