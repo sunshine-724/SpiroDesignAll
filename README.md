@@ -4,11 +4,16 @@
    以下のURLからすぐにアプリケーションにアクセスして利用できます。  
    https://sunshine-724.github.io/SpiroDesignAll/
 
-#### デモ動画
-   https://github.com/user-attachments/assets/bdc7cf71-0901-4b31-a661-b14960fee12e
-   
 ### 📱 スマホ版・タブレット版  
-   IOS版では自分のiPhone15(IOS 26.0)で確認済みです
+   このGithubリポジトリをcloneして、ビルドしたのち、エミュレーター(もしくは自分の端末)で利用することができます
+   App StoreやGoogle Play Storeで公開すると料金取られるので、公開する予定はありません。
+
+#### デモ動画
+   #### Web版
+   https://github.com/user-attachments/assets/bdc7cf71-0901-4b31-a661-b14960fee12e
+
+   #### スマートフォン版(IPhone)
+   https://github.com/user-attachments/assets/78fd85fb-cac1-4d86-8c18-eb56fb19375e
 ---
 ## アプリケーション実行ガイド(開発者向け)
 このガイドは、各プラットフォームでアプリケーションをビルドし、実行するための手順をまとめたものです。
